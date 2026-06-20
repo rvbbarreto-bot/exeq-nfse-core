@@ -1,0 +1,171 @@
+{
+  "version": 1,
+  "validated_at": "2026-05-24",
+  "rules": [
+    {
+      "schema": "exeq.fiscal_p0_fixture.v1",
+      "catalog_source": "US-FIS-00 estudo Prefeitura Barueri — RASCUNHO contador",
+      "input": {
+        "fiscal_profile_name": "Perfil Piloto SP",
+        "ibge_code": "3505708",
+        "municipio_nome": "Barueri",
+        "uf": "SP",
+        "service_code": "1.01",
+        "service_description": "Análise e desenvolvimento de sistemas",
+        "tax_regime": "simples_nacional",
+        "competence_date": "2026-06-01"
+      },
+      "expected": {
+        "iss_rate": 0.02,
+        "iss_retained": false,
+        "irrf_rate": 0.0,
+        "pis_rate": 0.0,
+        "cofins_rate": 0.0,
+        "csll_rate": 0.0,
+        "simples_codigo_tributacao": 3
+      },
+      "metadata": {
+        "status_validacao": "RASCUNHO",
+        "observacao_contador": "RASCUNHO US-FIS-00. ISS 2% PJ item 01.01.01 (Análise e desenvolvimento) — Tabela códigos PJ Barueri. Fonte: https://portal.barueri.sp.gov.br/arquivos/sites/sfn/downloads/TabelacodigosPJ.pdf (acesso 24/05/2026). Validar contador.",
+        "priority": 100
+      }
+    },
+    {
+      "schema": "exeq.fiscal_p0_fixture.v1",
+      "catalog_source": "US-FIS-00 estudo Prefeitura Barueri — RASCUNHO contador",
+      "input": {
+        "fiscal_profile_name": "Perfil Piloto SP",
+        "ibge_code": "3505708",
+        "municipio_nome": "Barueri",
+        "uf": "SP",
+        "service_code": "1.01",
+        "service_description": "Análise e desenvolvimento de sistemas",
+        "tax_regime": "lucro_presumido",
+        "competence_date": "2026-06-01"
+      },
+      "expected": {
+        "iss_rate": 0.02,
+        "iss_retained": false,
+        "irrf_rate": 0.015,
+        "pis_rate": 0.0065,
+        "cofins_rate": 0.03,
+        "csll_rate": 0.01
+      },
+      "metadata": {
+        "status_validacao": "RASCUNHO",
+        "observacao_contador": "RASCUNHO — retenções federais espelham padrão piloto LP; validar tomador e dispensa.",
+        "priority": 100
+      }
+    },
+    {
+      "schema": "exeq.fiscal_p0_fixture.v1",
+      "catalog_source": "US-FIS-00 estudo Prefeitura Barueri — RASCUNHO contador",
+      "input": {
+        "fiscal_profile_name": "Perfil Piloto SP",
+        "ibge_code": "3505708",
+        "municipio_nome": "Barueri",
+        "uf": "SP",
+        "service_code": "1.07",
+        "service_description": "Suporte técnico em informática",
+        "tax_regime": "simples_nacional",
+        "competence_date": "2026-06-01"
+      },
+      "expected": {
+        "iss_rate": 0.02,
+        "iss_retained": false,
+        "irrf_rate": 0.0,
+        "pis_rate": 0.0,
+        "cofins_rate": 0.0,
+        "csll_rate": 0.0,
+        "simples_codigo_tributacao": 3
+      },
+      "metadata": {
+        "status_validacao": "RASCUNHO",
+        "observacao_contador": "RASCUNHO US-FIS-00. ISS 2% PJ item 01.07.01 (Suporte técnico) — tabela Barueri.",
+        "priority": 100
+      }
+    },
+    {
+      "schema": "exeq.fiscal_p0_fixture.v1",
+      "catalog_source": "US-FIS-00 estudo Prefeitura Barueri — RASCUNHO contador",
+      "input": {
+        "fiscal_profile_name": "Perfil Piloto SP",
+        "ibge_code": "3505708",
+        "municipio_nome": "Barueri",
+        "uf": "SP",
+        "service_code": "1.07",
+        "service_description": "Suporte técnico em informática",
+        "tax_regime": "lucro_presumido",
+        "competence_date": "2026-06-01"
+      },
+      "expected": {
+        "iss_rate": 0.02,
+        "iss_retained": false,
+        "irrf_rate": 0.015,
+        "pis_rate": 0.0065,
+        "cofins_rate": 0.03,
+        "csll_rate": 0.01
+      },
+      "metadata": {
+        "status_validacao": "RASCUNHO",
+        "observacao_contador": "RASCUNHO — validar contador.",
+        "priority": 100
+      }
+    },
+    {
+      "schema": "exeq.fiscal_p0_fixture.v1",
+      "catalog_source": "US-FIS-00 estudo Prefeitura Barueri — RASCUNHO contador",
+      "input": {
+        "fiscal_profile_name": "Perfil Piloto SP",
+        "ibge_code": "3505708",
+        "municipio_nome": "Barueri",
+        "uf": "SP",
+        "service_code": "1.06",
+        "service_description": "Consultoria em informática",
+        "tax_regime": "simples_nacional",
+        "competence_date": "2026-06-01"
+      },
+      "expected": {
+        "iss_rate": 0.02,
+        "iss_retained": false,
+        "irrf_rate": 0.0,
+        "pis_rate": 0.0,
+        "cofins_rate": 0.0,
+        "csll_rate": 0.0,
+        "simples_codigo_tributacao": 3
+      },
+      "metadata": {
+        "status_validacao": "RASCUNHO",
+        "observacao_contador": "RASCUNHO US-FIS-00. ISS 2% PJ itens 01.06.01/01.06.02 (Assessoria/Consultoria informática) — tabela Barueri.",
+        "priority": 100
+      }
+    },
+    {
+      "schema": "exeq.fiscal_p0_fixture.v1",
+      "catalog_source": "US-FIS-00 estudo Prefeitura Barueri — RASCUNHO contador",
+      "input": {
+        "fiscal_profile_name": "Perfil Piloto SP",
+        "ibge_code": "3505708",
+        "municipio_nome": "Barueri",
+        "uf": "SP",
+        "service_code": "1.06",
+        "service_description": "Consultoria em informática",
+        "tax_regime": "lucro_presumido",
+        "competence_date": "2026-06-01"
+      },
+      "expected": {
+        "iss_rate": 0.02,
+        "iss_retained": false,
+        "irrf_rate": 0.015,
+        "pis_rate": 0.0065,
+        "cofins_rate": 0.03,
+        "csll_rate": 0.01
+      },
+      "metadata": {
+        "status_validacao": "RASCUNHO",
+        "observacao_contador": "RASCUNHO — validar contador.",
+        "priority": 100
+      }
+    }
+  ]
+}

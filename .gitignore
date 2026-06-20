@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.channel
+*.log
+.DS_Store
+coverage/
+.turbo/
+e2e-report/
+test-results/
+playwright-report/
+.playwright/
+.homolog/

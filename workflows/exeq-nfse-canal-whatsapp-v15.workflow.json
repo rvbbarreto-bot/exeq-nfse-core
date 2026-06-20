@@ -1,0 +1,329 @@
+{
+  "name": "exeq-nfse-canal-whatsapp-v15",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "exeq-nfse-whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-in",
+      "name": "Webhook Evolution",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "v15-exeq-nfse-whatsapp"
+    },
+    {
+      "parameters": {
+        "jsCode": "function normalizeBrPhoneDigits(raw) {\n  let d = String(raw || '').replace(/\\D/g, '');\n  if (!d) return '';\n  if ((d.length === 10 || d.length === 11) && !d.startsWith('55')) d = '55' + d;\n  return d;\n}\n\nconst req = $json || {};\nconst body = req.body || req;\nif (body.phone || req.phone) {\n  const src = body.phone ? body : req;\n  const digits = normalizeBrPhoneDigits(src.phone || '');\n  return [{ json: {\n    ...req,\n    phone_e164: digits ? `+${digits}` : '',\n    message_id: src.message_id ?? `wa-${Date.now()}`,\n    text: String(src.text ?? ''),\n    contact_name: String(src.contact_name ?? ''),\n    has_audio: false,\n    evento_valido: true,\n    webhook_meta: { mode: 'smoke' },\n  }}];\n}\n\nconst data = body.data || {};\nconst key = data.key || {};\nconst event = String(body.event || '').trim();\nconst fromMe = key.fromMe === true || data.fromMe === true;\nconst remoteJid = String(key.remoteJid || key.remoteJidAlt || data.remoteJid || '').trim();\nconst msg = data.message || {};\nconst texto = msg.conversation || msg.extendedTextMessage?.text || msg.imageMessage?.caption || msg.videoMessage?.caption || msg.documentMessage?.caption || '';\nconst audioUrl = msg.audioMessage?.url || msg.pttMessage?.url || null;\nconst textoLimpo = String(texto || '').trim();\nconst hasAudio = Boolean(audioUrl);\nconst status = String(data.status || '').trim();\nconst isMessageUpsert = event === 'messages.upsert';\nconst isAckOnly = !textoLimpo && !hasAudio && !!status;\nconst isGroup = remoteJid.endsWith('@g.us');\nconst evento_valido = Boolean(isMessageUpsert && !fromMe && !isGroup && !isAckOnly && (textoLimpo.length > 0 || hasAudio));\nconst jidDigits = normalizeBrPhoneDigits(remoteJid.replace(/@.*$/, ''));\n\nreturn [{ json: {\n  ...req,\n  evento_valido,\n  has_audio: hasAudio,\n  audio_url: audioUrl,\n  phone_e164: jidDigits ? `+${jidDigits}` : '',\n  message_id: key.id ?? `wa-${Date.now()}`,\n  text: textoLimpo,\n  contact_name: data.pushName ?? '',\n  webhook_meta: { event, fromMe, remoteJid, status, hasText: textoLimpo.length > 0, hasAudio, isAckOnly, isGroup },\n} }];"
+      },
+      "id": "filter-webhook",
+      "name": "Filtrar Evento Webhook",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "ev-ok",
+              "leftValue": "={{ $json.evento_valido === true }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-valid",
+      "name": "Evento Valido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $input.first().json;\nconst openaiKey = ($env.OPENAI_API_KEY || '').trim();\nlet text = String(prep.text || '').trim();\nlet transcribed = String(prep.transcribed_text || '').trim();\n\nif (!text && !transcribed && prep.has_audio && prep.audio_url && openaiKey) {\n  try {\n    const audioRes = await this.helpers.httpRequest({ method: 'GET', url: prep.audio_url, encoding: 'arraybuffer', returnFullResponse: true });\n    const buffer = Buffer.from(audioRes.body);\n    const form = new FormData();\n    form.append('file', new Blob([buffer], { type: 'audio/ogg' }), 'audio.ogg');\n    form.append('model', 'whisper-1');\n    form.append('language', 'pt');\n    const whisper = await this.helpers.httpRequest({\n      method: 'POST',\n      url: $env.OPENAI_API_URL || 'https://api.openai.com/v1/audio/transcriptions',\n      headers: { Authorization: `Bearer ${openaiKey}` },\n      body: form,\n      json: true,\n    });\n    transcribed = String(whisper.text || '').trim();\n  } catch (e) {\n    transcribed = '';\n  }\n}\n\nreturn [{ json: { ...prep, text, transcribed_text: transcribed } }];"
+      },
+      "id": "prep-texto",
+      "name": "Preparar Texto Audio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 280]
+    },
+    {
+      "parameters": {
+        "jsCode": "function normalizeBrPhoneDigits(raw) {\n  let d = String(raw || '').replace(/\\D/g, '');\n  if (!d) return '';\n  if ((d.length === 10 || d.length === 11) && !d.startsWith('55')) d = '55' + d;\n  return d;\n}\n\nconst prep = $input.first().json;\nconst digits = normalizeBrPhoneDigits(prep.phone_e164 || '');\nreturn [{ json: {\n  ...prep,\n  phone_e164: digits ? `+${digits}` : prep.phone_e164,\n  sender_phone_e164: digits ? `+${digits}` : prep.phone_e164,\n  evolution_number: digits,\n  phone_identified: digits.length >= 10,\n} }];"
+      },
+      "id": "validar-telefone",
+      "name": "Normalizar Telefone Cliente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 280]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "phone-ok",
+              "leftValue": "={{ $json.phone_identified === true }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-paired",
+      "name": "Telefone Identificado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1160, 280]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nlet reason = 'ignored';\nlet reply_text = '';\nconst digits = String(item.evolution_number || item.phone_e164 || '').replace(/\\D/g, '');\nif (item.evento_valido === false) {\n  reason = 'invalid_event';\n} else if (digits.length < 10) {\n  reason = 'missing_phone';\n  reply_text = 'Não consegui identificar seu número de WhatsApp. Envie a mensagem novamente.';\n}\nreturn [{ json: {\n  ignored: true,\n  skip_reason: reason,\n  session_id: null,\n  emitted: false,\n  send_reply: reply_text.length > 0,\n  reply_text,\n  evolution_number: digits,\n  phone_e164: item.phone_e164,\n} }];"
+      },
+      "id": "prep-ignored",
+      "name": "Preparar Resposta Ignorada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [980, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\nconst inbound = {\n  phone_e164: row.phone_e164,\n  message_id: row.message_id,\n  text: String(row.text || ''),\n  contact_name: String(row.contact_name || ''),\n};\nconst transcribed = String(row.transcribed_text || '').trim();\nif (transcribed) inbound.transcribed_text = transcribed;\nreturn [{ json: { ...row, ...inbound, has_audio: row.has_audio === true } }];"
+      },
+      "id": "build-inbound-body",
+      "name": "Montar Body Inbound",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 280]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $input.first().json;\nconst base = String($env.EXEQ_API_BASE_URL || 'http://host.docker.internal:3002').replace(/\\/$/, '');\nconst tenant = $env.EXEQ_TENANT_SLUG || 'piloto-sp';\nconst token = $env.EXEQ_CHANNEL_TOKEN || 'sandbox-channel-token-piloto';\ntry {\n  const body = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${base}/v1/channel/inbound`,\n    headers: {\n      'x-tenant-slug': tenant,\n      'x-channel-token': token,\n      'content-type': 'application/json',\n    },\n    body: {\n      phone_e164: prep.phone_e164,\n      message_id: prep.message_id,\n      text: prep.text || '',\n      contact_name: prep.contact_name || '',\n      ...(String(prep.transcribed_text || '').trim()\n        ? { transcribed_text: String(prep.transcribed_text).trim() }\n        : {}),\n    },\n    json: true,\n  });\n  const reply = String(body.reply_text || '').trim();\n  const sendReply = body.send_reply !== false && reply.length > 0;\n  return [{ json: {\n    ...body,\n    phone_e164: prep.phone_e164,\n    reply_text: reply,\n    send_reply: sendReply,\n    buffered: body.buffered === true,\n    debounce_message_count: body.debounce_message_count ?? null,\n    evolution_number: String(prep.phone_e164 || '').replace(/\\D/g, ''),\n    prep_has_audio: prep.has_audio === true,\n  }}];\n} catch (e) {\n  return [{ json: {\n    session_id: null,\n    emitted: false,\n    phone_e164: prep.phone_e164,\n    reply_text: 'Não consegui contactar a API Core (host.docker.internal:3002).',\n    send_reply: true,\n    buffered: false,\n    evolution_number: String(prep.phone_e164 || '').replace(/\\D/g, ''),\n  }}];\n}"
+      },
+      "id": "api-inbound",
+      "name": "API Channel Inbound",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 280]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Montar Body Inbound').first().json;\nconst raw = $input.first().json ?? {};\nconst api = raw.session_id != null || raw.buffered === true ? raw : (raw.body && typeof raw.body === 'object' ? raw.body : raw);\nlet reply = String(api.reply_text || '').trim();\nif (api.buffered === true) {\n  return [{ json: {\n    ...api,\n    phone_e164: prep.phone_e164,\n    reply_text: '',\n    send_reply: false,\n    buffered: true,\n    evolution_number: String(prep.phone_e164 || '').replace(/\\D/g, ''),\n  }}];\n}\nif (!reply && prep.has_audio) {\n  reply = 'Recebi seu áudio. Para transcrição automática, configure OPENAI_API_KEY no n8n. Por ora, envie os dados em texto (ex.: R$ 1,00 serviço: consultoria).';\n}\nif (!reply && Number(raw.statusCode) >= 400) {\n  reply = String(api.message || api.error || `Erro HTTP ${raw.statusCode} na API Core`);\n}\nif (!reply && !api.session_id && api.buffered !== true) {\n  reply = 'Não consegui processar sua mensagem na API Core. Verifique se a API está no ar (porta 3002).';\n}\nconst send_reply = api.send_reply !== false && reply.length > 0;\nconst evolution_number = String(prep.phone_e164 || '').replace(/\\D/g, '');\nreturn [{ json: { ...api, phone_e164: prep.phone_e164, reply_text: reply, send_reply, buffered: api.buffered === true, evolution_number } }];"
+      },
+      "id": "build-reply",
+      "name": "Montar Resposta WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1480, 280]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "send-ok",
+              "leftValue": "={{ $json.send_reply === true && String($json.evolution_number || '').length >= 10 }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-send-reply",
+      "name": "Enviar Resposta?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1640, 280]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst evolutionUrl = String($env.EVOLUTION_API_URL || 'http://evolution:8080').replace(/\\/$/, '');\nconst instance = $env.EVOLUTION_INSTANCE || 'exeq-nfse-core';\nconst apiKey = $env.EVOLUTION_API_KEY || '';\nconst number = String(item.evolution_number || '').replace(/\\D/g, '');\nconst text = String(item.reply_text || '').trim();\nif (!number || !text) {\n  return [{ json: { ...item, evolution_sent: false, evolution_skip: 'missing number or text' } }];\n}\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${evolutionUrl}/message/sendText/${encodeURIComponent(instance)}`,\n    headers: { apikey: apiKey, 'content-type': 'application/json' },\n    body: { number, text },\n    json: true,\n  });\n  return [{ json: { ...item, evolution_sent: true } }];\n} catch (e) {\n  return [{ json: { ...item, evolution_sent: false, evolution_error: String(e.message || e) } }];\n}"
+      },
+      "id": "send-reply",
+      "name": "Evolution Send Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1800, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{\n  json: {\n    ok: true,\n    ignored: item.ignored ?? false,\n    reason: item.skip_reason ?? item.debounce_reason ?? null,\n    session_id: item.session_id ?? null,\n    status: item.status ?? null,\n    reply_text: item.reply_text ?? null,\n    issue_id: item.issue_id ?? null,\n    emitted: item.emitted ?? false,\n    send_reply: item.send_reply ?? false,\n    buffered: item.buffered ?? false,\n    debounce_message_count: item.debounce_message_count ?? null,\n  },\n}];"
+      },
+      "id": "build-webhook-response",
+      "name": "Montar Resposta Webhook",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1960, 280]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2120, 280]
+    },
+    {
+      "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 1 }] } },
+      "id": "poll-notifications",
+      "name": "Poll Notifications",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 560]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = String($env.EXEQ_API_BASE_URL || 'http://host.docker.internal:3002').replace(/\\/$/, '');\nconst tenant = $env.EXEQ_TENANT_SLUG || 'piloto-sp';\nconst token = $env.EXEQ_CHANNEL_TOKEN || 'sandbox-channel-token-piloto';\nconst url = `${base}/v1/channel/notifications/pending?limit=20`;\ntry {\n  const body = await this.helpers.httpRequest({\n    method: 'GET',\n    url,\n    headers: { 'x-tenant-slug': tenant, 'x-channel-token': token },\n    json: true,\n  });\n  return [{ json: { statusCode: 200, body, api_url: url } }];\n} catch (e) {\n  const statusCode = e.statusCode || e.response?.statusCode || 0;\n  return [{ json: {\n    statusCode,\n    error: String(e.message || e),\n    body: { items: [] },\n    api_url: url,\n  }}];\n}"
+      },
+      "id": "fetch-pending",
+      "name": "API Pending Notifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 560]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json ?? {};\nconst statusCode = Number(raw.statusCode ?? raw.status ?? 200);\nconst apiError = raw.error ? String(raw.error) : null;\nconst body = raw.body && typeof raw.body === 'object' ? raw.body : raw;\nconst items = Array.isArray(body.items) ? body.items : [];\nconst filtered = items.filter((i) => i?.id && i?.phone_e164 && i?.message_body);\nconst apiOk = statusCode >= 200 && statusCode < 300 && !apiError;\nlet hint = null;\nif (apiError) hint = `Erro ao consultar pending: ${apiError} (${raw.api_url || 'url desconhecida'})`;\nelse if (filtered.length === 0) hint = 'Sem notificacoes pendentes — normal durante coleta de dados ou enquanto emissao processa (authorized/rejected)';\nreturn [{\n  json: {\n    api_ok: apiOk,\n    status_code: statusCode,\n    api_url: raw.api_url ?? null,\n    api_error: apiError,\n    pending_total: items.length,\n    pending_filtered: filtered.length,\n    has_pending: filtered.length > 0,\n    items: filtered,\n    hint,\n  },\n}];"
+      },
+      "id": "normalize-pending",
+      "name": "Normalizar Pending API",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 560]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "has-pending",
+              "leftValue": "={{ $json.has_pending === true }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-has-pending",
+      "name": "Tem Pending?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [820, 560]
+    },
+    {
+      "parameters": {
+        "jsCode": "const batch = $input.first().json ?? {};\nreturn [{ json: {\n  ok: true,\n  action: 'skip_poll',\n  api_ok: batch.api_ok !== false,\n  api_error: batch.api_error ?? null,\n  pending_total: batch.pending_total ?? 0,\n  pending_filtered: batch.pending_filtered ?? 0,\n  hint: batch.hint ?? 'Sem notificacoes pendentes — fluxo encerrado normalmente (aguardar proximo poll)',\n}}];"
+      },
+      "id": "no-pending-ok",
+      "name": "Sem Pending (Normal)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 620]
+    },
+    {
+      "parameters": {
+        "jsCode": "const batch = $input.first().json;\nconst items = Array.isArray(batch.items) ? batch.items : [];\nreturn items.map((i) => ({\n  json: {\n    ...i,\n    evolution_number: String(i.phone_e164 || '').replace(/\\D/g, ''),\n  },\n}));"
+      },
+      "id": "expand-pending",
+      "name": "Expand Pending Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 520]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst evolutionUrl = String($env.EVOLUTION_API_URL || 'http://evolution:8080').replace(/\\/$/, '');\nconst instance = $env.EVOLUTION_INSTANCE || 'exeq-nfse-core';\nconst apiKey = $env.EVOLUTION_API_KEY || '';\nconst number = String(item.evolution_number || '').replace(/\\D/g, '');\nconst text = String(item.message_body || '').trim();\nif (!number || !text) {\n  return [{ json: { ...item, evolution_sent: false, evolution_skip: 'missing number or message_body' } }];\n}\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${evolutionUrl}/message/sendText/${encodeURIComponent(instance)}`,\n    headers: { apikey: apiKey, 'content-type': 'application/json' },\n    body: { number, text },\n    json: true,\n  });\n  return [{ json: { ...item, evolution_sent: true } }];\n} catch (e) {\n  return [{ json: { ...item, evolution_sent: false, evolution_error: String(e.message || e) } }];\n}"
+      },
+      "id": "send-status",
+      "name": "Evolution Send Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1220, 520]
+    },
+    {
+      "parameters": {
+        "jsCode": "const notif = $('Expand Pending Items').item.json;\nreturn [{ json: { id: notif.id, phone_e164: notif.phone_e164 } }];"
+      },
+      "id": "preserve-notif-id",
+      "name": "Preservar ID Notificacao",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 520]
+    },
+    {
+      "parameters": {
+        "jsCode": "const notif = $input.first().json;\nconst base = String($env.EXEQ_API_BASE_URL || 'http://host.docker.internal:3002').replace(/\\/$/, '');\nconst tenant = $env.EXEQ_TENANT_SLUG || 'piloto-sp';\nconst token = $env.EXEQ_CHANNEL_TOKEN || 'sandbox-channel-token-piloto';\nconst url = `${base}/v1/channel/notifications/${notif.id}/ack`;\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url,\n    headers: { 'x-tenant-slug': tenant, 'x-channel-token': token, 'content-type': 'application/json' },\n    body: {},\n    json: true,\n  });\n  return [{ json: { acked: true, id: notif.id, phone_e164: notif.phone_e164, api_url: url } }];\n} catch (e) {\n  return [{ json: { acked: false, id: notif.id, error: String(e.message || e), api_url: url } }];\n}"
+      },
+      "id": "ack-notification",
+      "name": "API Ack Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 520]
+    }
+  ],
+  "connections": {
+    "Webhook Evolution": { "main": [[{ "node": "Filtrar Evento Webhook", "type": "main", "index": 0 }]] },
+    "Filtrar Evento Webhook": { "main": [[{ "node": "Evento Valido?", "type": "main", "index": 0 }]] },
+    "Evento Valido?": {
+      "main": [
+        [{ "node": "Preparar Texto Audio", "type": "main", "index": 0 }],
+        [{ "node": "Preparar Resposta Ignorada", "type": "main", "index": 0 }]
+      ]
+    },
+    "Preparar Texto Audio": { "main": [[{ "node": "Normalizar Telefone Cliente", "type": "main", "index": 0 }]] },
+    "Normalizar Telefone Cliente": { "main": [[{ "node": "Telefone Identificado?", "type": "main", "index": 0 }]] },
+    "Telefone Identificado?": {
+      "main": [
+        [{ "node": "Montar Body Inbound", "type": "main", "index": 0 }],
+        [{ "node": "Preparar Resposta Ignorada", "type": "main", "index": 0 }]
+      ]
+    },
+    "Montar Body Inbound": { "main": [[{ "node": "API Channel Inbound", "type": "main", "index": 0 }]] },
+    "API Channel Inbound": { "main": [[{ "node": "Montar Resposta WhatsApp", "type": "main", "index": 0 }]] },
+    "Montar Resposta WhatsApp": { "main": [[{ "node": "Enviar Resposta?", "type": "main", "index": 0 }]] },
+    "Enviar Resposta?": {
+      "main": [
+        [{ "node": "Evolution Send Reply", "type": "main", "index": 0 }],
+        [{ "node": "Montar Resposta Webhook", "type": "main", "index": 0 }]
+      ]
+    },
+    "Evolution Send Reply": { "main": [[{ "node": "Montar Resposta Webhook", "type": "main", "index": 0 }]] },
+    "Preparar Resposta Ignorada": { "main": [[{ "node": "Enviar Resposta?", "type": "main", "index": 0 }]] },
+    "Montar Resposta Webhook": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] },
+    "Poll Notifications": { "main": [[{ "node": "API Pending Notifications", "type": "main", "index": 0 }]] },
+    "API Pending Notifications": { "main": [[{ "node": "Normalizar Pending API", "type": "main", "index": 0 }]] },
+    "Normalizar Pending API": { "main": [[{ "node": "Tem Pending?", "type": "main", "index": 0 }]] },
+    "Tem Pending?": {
+      "main": [
+        [{ "node": "Expand Pending Items", "type": "main", "index": 0 }],
+        [{ "node": "Sem Pending (Normal)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Expand Pending Items": { "main": [[{ "node": "Evolution Send Status", "type": "main", "index": 0 }]] },
+    "Evolution Send Status": { "main": [[{ "node": "Preservar ID Notificacao", "type": "main", "index": 0 }]] },
+    "Preservar ID Notificacao": { "main": [[{ "node": "API Ack Notification", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": true,
+  "meta": {
+    "description": "V15 — transporte Evolution→Core; debounce Redis na API (CHANNEL_DEBOUNCE_SECONDS); qualquer cliente que envia para a linha Exeq."
+  }
+}

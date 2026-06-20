@@ -1,0 +1,28 @@
+{
+  "schema": "exeq.fiscal_p0_fixture.v1",
+  "catalog_source": "CATALOGO_MUNICIPAL_PILOTO_v1_VALIDADO_2026-05-23.csv",
+  "input": {
+    "fiscal_profile_name": "Perfil Piloto SP",
+    "ibge_code": "3507605",
+    "municipio_nome": "Bragança Paulista",
+    "uf": "SP",
+    "service_code": "1.07",
+    "service_description": "Suporte técnico em informática",
+    "tax_regime": "simples_nacional",
+    "competence_date": "2026-06-01"
+  },
+  "expected": {
+    "iss_rate": 0.02,
+    "iss_retained": false,
+    "irrf_rate": 0.0,
+    "pis_rate": 0.0,
+    "cofins_rate": 0.0,
+    "csll_rate": 0.0,
+    "simples_codigo_tributacao": 3
+  },
+  "metadata": {
+    "status_validacao": "VALIDADO_CONTADOR",
+    "observacao_contador": "LC 116 item 1.07 - Suporte tecnico em informatica. ISS 2% validado para Bragança Paulista. ISS retido=false para regra municipal padrao sem tomador substituto informado. Retencoes federais zeradas para linha Simples; recolhimento via DAS, salvo excecoes especificas nao tratadas neste catalogo piloto. Fonte ISS Braganca Paulista: https://braganca.sp.gov.br/uploads/files/2014/11/Ed_152-WEB.pdf (Anexo I: 1.01/1.06/1.07 = 2%).",
+    "priority": 100
+  }
+}

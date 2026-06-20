@@ -1,0 +1,28 @@
+{
+  "schema": "exeq.fiscal_p0_fixture.v1",
+  "catalog_source": "CATALOGO_MUNICIPAL_PILOTO_v1_VALIDADO_2026-05-23.csv",
+  "input": {
+    "fiscal_profile_name": "Perfil Piloto SP",
+    "ibge_code": "3504107",
+    "municipio_nome": "Atibaia",
+    "uf": "SP",
+    "service_code": "1.06",
+    "service_description": "Consultoria em informática",
+    "tax_regime": "simples_nacional",
+    "competence_date": "2026-06-01"
+  },
+  "expected": {
+    "iss_rate": 0.02,
+    "iss_retained": false,
+    "irrf_rate": 0.0,
+    "pis_rate": 0.0,
+    "cofins_rate": 0.0,
+    "csll_rate": 0.0,
+    "simples_codigo_tributacao": 3
+  },
+  "metadata": {
+    "status_validacao": "VALIDADO_CONTADOR",
+    "observacao_contador": "LC 116 item 1.06 - Assessoria e consultoria em informatica; corrigido de 1.04, pois 1.04 refere-se a elaboracao de programas de computadores. ISS 2% validado para Atibaia. ISS retido=false para regra municipal padrao sem tomador substituto informado. Retencoes federais zeradas para linha Simples; recolhimento via DAS, salvo excecoes especificas nao tratadas neste catalogo piloto. Fonte ISS Atibaia: https://www.anoregsp.org.br/ISSQN/Atibaia/Atibaia_LC.280-98.pdf (Art.77: 1.01/1.06/1.07 = 2%). Retencao ISS: item nao consta nas hipoteses de responsabilidade do art.72B para esses servicos.",
+    "priority": 100
+  }
+}

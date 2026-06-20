@@ -1,0 +1,244 @@
+{
+  "name": "exeq-nfse-canal-whatsapp-v14",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "exeq-nfse-whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-in",
+      "name": "WhatsApp Inbound",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "e08bf3ad-ffe5-43fc-bdb4-6fb05e814612"
+    },
+    {
+      "parameters": {
+        "jsCode": "const root = $input.first().json;\nconst body = root.body ?? root;\n\nif (body.phone) {\n  return [{\n    json: {\n      phone_e164: body.phone.startsWith('+') ? body.phone : `+${body.phone.replace(/\\D/g, '')}`,\n      message_id: body.message_id ?? `wa-${Date.now()}`,\n      text: body.text ?? '',\n      transcribed_text: body.transcribed_text ?? '',\n      audio_url: body.audio_url ?? null,\n    },\n  }];\n}\n\nconst data = body.data ?? root.data ?? {};\nconst key = data.key ?? {};\nif (key.fromMe === true) return [];\n\nconst jid = key.remoteJid ?? body.sender ?? '';\nconst digits = jid.replace(/@.*/, '').replace(/\\D/g, '');\nconst phone_e164 = digits ? `+${digits}` : '';\nif (!phone_e164) throw new Error('Evolution payload sem telefone');\n\nconst msg = data.message ?? {};\nlet text = '';\nlet audio_url = null;\n\nif (msg.conversation) text = msg.conversation;\nelse if (msg.extendedTextMessage?.text) text = msg.extendedTextMessage.text;\nelse if (msg.audioMessage?.url) audio_url = msg.audioMessage.url;\nelse if (msg.pttMessage?.url) audio_url = msg.pttMessage.url;\n\nreturn [{\n  json: {\n    phone_e164,\n    message_id: key.id ?? `wa-${Date.now()}`,\n    text,\n    transcribed_text: '',\n    audio_url,\n  },\n}];"
+      },
+      "id": "map-evolution",
+      "name": "Map Evolution Inbound",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "has-audio",
+              "leftValue": "={{ $json.audio_url }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-audio",
+      "name": "Tem Audio?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [560, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.OPENAI_API_URL || 'https://api.openai.com/v1/audio/transcriptions'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{$env.OPENAI_API_KEY}}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "whisper-1" },
+            { "name": "language", "value": "pt" },
+            { "name": "file", "parameterType": "formBinaryData", "inputDataFieldName": "data" }
+          ]
+        },
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "transcribe-audio",
+      "name": "Transcrever Audio (opcional)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 200],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const inbound = $('Map Evolution Inbound').item.json;\nconst audio = inbound.audio_url;\nconst openaiKey = $env.OPENAI_API_KEY;\nlet transcribed = '';\nif (audio && openaiKey) {\n  // Placeholder: habilite nó Transcrever quando OPENAI_API_KEY estiver no n8n\n  transcribed = '';\n}\nreturn [{\n  json: {\n    phone_e164: inbound.phone_e164,\n    message_id: inbound.message_id,\n    text: inbound.text || '',\n    transcribed_text: transcribed,\n    needs_audio_help: Boolean(audio && !openaiKey),\n  },\n}];"
+      },
+      "id": "merge-audio-text",
+      "name": "Preparar Texto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Preparar Texto').item.json;\nconst base = $env.EXEQ_API_BASE_URL;\nconst res = await this.helpers.httpRequest({\n  method: 'POST',\n  url: `${base}/v1/channel/inbound`,\n  headers: {\n    'x-tenant-slug': $env.EXEQ_TENANT_SLUG,\n    'x-channel-token': $env.EXEQ_CHANNEL_TOKEN,\n    'content-type': 'application/json',\n  },\n  body: {\n    phone_e164: prep.phone_e164,\n    message_id: prep.message_id,\n    text: prep.needs_audio_help ? '' : (prep.text || ''),\n    transcribed_text: prep.transcribed_text || '',\n  },\n  json: true,\n});\nreturn [{ json: res }];"
+      },
+      "id": "api-inbound",
+      "name": "API Channel Inbound",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Preparar Texto').item.json;\nconst api = $input.first().json;\nlet reply = api.reply_text || 'Processado.';\nif (prep.needs_audio_help) {\n  reply = 'Recebi seu áudio. Para transcrição automática, configure OPENAI_API_KEY no n8n. Por ora, envie os dados em texto (ex.: R$ 1,00 serviço: consultoria).';\n}\nreturn [{ json: { ...api, reply_text: reply, phone_e164: prep.phone_e164 } }];"
+      },
+      "id": "build-reply",
+      "name": "Montar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.EVOLUTION_API_URL}}/message/sendText/{{$env.EVOLUTION_INSTANCE}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.EVOLUTION_API_KEY}}" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { number: $json.phone_e164.replace(/^\\\\+/, ''), text: $json.reply_text } }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "send-whatsapp-reply",
+      "name": "Evolution Send Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, session_id: $('Montar Resposta').item.json.session_id, emitted: $('Montar Resposta').item.json.emitted } }}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1440, 400]
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 1 }] }
+      },
+      "id": "poll-notifications",
+      "name": "Poll Notifications",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 640]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.EXEQ_API_BASE_URL}}/v1/channel/notifications/pending",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-tenant-slug", "value": "={{$env.EXEQ_TENANT_SLUG}}" },
+            { "name": "x-channel-token", "value": "={{$env.EXEQ_CHANNEL_TOKEN}}" }
+          ]
+        },
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "fetch-pending",
+      "name": "API Pending Notifications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 640]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = Array.isArray($input.first().json.items) ? $input.first().json.items : [];\nreturn items.filter(i => i?.id && i?.phone_e164 && i?.message_body).map(i => ({ json: i }));"
+      },
+      "id": "expand-pending",
+      "name": "Expand Pending Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 640]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.EVOLUTION_API_URL}}/message/sendText/{{$env.EVOLUTION_INSTANCE}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.EVOLUTION_API_KEY}}" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { number: $json.phone_e164.replace(/^\\\\+/, ''), text: $json.message_body } }}",
+        "options": {}
+      },
+      "id": "send-whatsapp",
+      "name": "Evolution Send Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 640]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.EXEQ_API_BASE_URL}}/v1/channel/notifications/{{$('Expand Pending Items').item.json.id}}/ack",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-tenant-slug", "value": "={{$env.EXEQ_TENANT_SLUG}}" },
+            { "name": "x-channel-token", "value": "={{$env.EXEQ_CHANNEL_TOKEN}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ack-notification",
+      "name": "API Ack Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 640]
+    }
+  ],
+  "connections": {
+    "WhatsApp Inbound": { "main": [[{ "node": "Map Evolution Inbound", "type": "main", "index": 0 }]] },
+    "Map Evolution Inbound": { "main": [[{ "node": "Tem Audio?", "type": "main", "index": 0 }]] },
+    "Tem Audio?": {
+      "main": [
+        [{ "node": "Preparar Texto", "type": "main", "index": 0 }],
+        [{ "node": "Preparar Texto", "type": "main", "index": 0 }]
+      ]
+    },
+    "Preparar Texto": { "main": [[{ "node": "API Channel Inbound", "type": "main", "index": 0 }]] },
+    "API Channel Inbound": { "main": [[{ "node": "Montar Resposta", "type": "main", "index": 0 }]] },
+    "Montar Resposta": { "main": [[{ "node": "Evolution Send Reply", "type": "main", "index": 0 }]] },
+    "Evolution Send Reply": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] },
+    "Poll Notifications": { "main": [[{ "node": "API Pending Notifications", "type": "main", "index": 0 }]] },
+    "API Pending Notifications": { "main": [[{ "node": "Expand Pending Items", "type": "main", "index": 0 }]] },
+    "Expand Pending Items": { "main": [[{ "node": "Evolution Send Status", "type": "main", "index": 0 }]] },
+    "Evolution Send Status": { "main": [[{ "node": "API Ack Notification", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": true,
+  "meta": {
+    "description": "Canal WhatsApp V14 — conversa PT-BR + áudio + Focus Nacional Atibaia via POST /v1/channel/inbound (ADR-007)."
+  }
+}

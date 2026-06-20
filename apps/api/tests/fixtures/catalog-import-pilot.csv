@@ -1,0 +1,3 @@
+catalog_version,fiscal_profile_name,ibge_code,municipio_nome,uf,service_code,service_description,tax_regime,iss_rate,iss_retained,irrf_rate,pis_rate,cofins_rate,csll_rate,simples_codigo_tributacao,valid_from,valid_to,priority,observacao_contador
+1,Perfil Piloto SP,3504107,Atibaia,SP,1.01,Analise e desenvolvimento de sistemas,simples_nacional,0.0200,false,0,0,0,0,3,2026-06-01,,100,teste fase3
+1,Perfil Piloto SP,3504107,Atibaia,SP,1.01,Analise e desenvolvimento de sistemas,lucro_presumido,0.0200,false,0.0150,0.0065,0.0300,0.0100,,2026-06-01,,100,teste fase3

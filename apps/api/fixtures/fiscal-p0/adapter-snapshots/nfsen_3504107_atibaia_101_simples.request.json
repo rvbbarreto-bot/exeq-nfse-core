@@ -1,0 +1,28 @@
+{
+  "data_emissao": "2026-06-01T00:00:00-03:00",
+  "data_competencia": "2026-06-01",
+  "codigo_municipio_emissora": 3504107,
+  "cnpj_prestador": "11222333000181",
+  "codigo_opcao_simples_nacional": 3,
+  "regime_especial_tributacao": 0,
+  "regime_tributario_simples_nacional": 1,
+  "razao_social_tomador": "Tomador Homologacao",
+  "codigo_municipio_prestacao": 3504107,
+  "codigo_tributacao_nacional_iss": "010101",
+  "descricao_servico": "Análise e desenvolvimento de sistemas",
+  "valor_servico": 1500,
+  "valor_iss": 30,
+  "tributacao_iss": 1,
+  "tipo_retencao_iss": 1,
+  "cep_tomador": "12940000",
+  "logradouro_tomador": "Rua Dona Sinha",
+  "numero_tomador": "100",
+  "bairro_tomador": "Centro",
+  "percentual_total_tributos_federais": "0.00",
+  "percentual_total_tributos_estaduais": "0.00",
+  "percentual_total_tributos_municipais": "2.00",
+  "situacao_tributaria_pis_cofins": "00",
+  "cpf_tomador": "52998224725",
+  "codigo_municipio_tomador": 3504107
+}
+

@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: exeq
+          POSTGRES_PASSWORD: exeq_dev
+          POSTGRES_DB: exeq_nfse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U exeq -d exeq_nfse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://exeq_app:exeq_app_dev@localhost:5432/exeq_nfse
+      MIGRATION_DATABASE_URL: postgres://exeq:exeq_dev@localhost:5432/exeq_nfse
+      JWT_SECRET: ci-jwt-secret-minimum-32-characters-long
+      MASTER_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build -w @exeq/shared
+
+      - run: npm run lint -w @exeq/api
+
+      - run: npm run lint -w @exeq/admin
+
+      - run: npm run db:migrate -w @exeq/api
+
+      - run: npm run db:seed -w @exeq/api
+
+      - run: npm run test -w @exeq/api
+
+      - run: npm run test -w @exeq/admin

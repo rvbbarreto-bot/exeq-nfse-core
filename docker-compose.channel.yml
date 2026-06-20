@@ -1,0 +1,152 @@
+# Stack canal NFSe — Opção B (PO 2026-05-30)
+# Isolada de barbearia-saas (5679/8081).
+#
+# Pré-requisito: infra base (Postgres 55432 + Redis 6382)
+#   docker compose up -d
+#
+# Canal (n8n + Evolution):
+#   docker compose -f docker-compose.yml -f docker-compose.channel.yml --profile channel up -d
+#
+# Segredos: copiar .env.channel.example → .env.channel (não commitar)
+
+services:
+  n8n-postgres:
+    profiles: ["channel"]
+    image: postgres:16-alpine
+    container_name: nfse-n8n-postgres
+    environment:
+      POSTGRES_DB: ${N8N_POSTGRES_DB:-n8n_nfse}
+      POSTGRES_USER: ${N8N_POSTGRES_USER:-n8n_nfse}
+      POSTGRES_PASSWORD: ${N8N_POSTGRES_PASSWORD:?Defina N8N_POSTGRES_PASSWORD em .env.channel}
+    volumes:
+      - nfse_n8n_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${N8N_POSTGRES_USER:-n8n_nfse} -d ${N8N_POSTGRES_DB:-n8n_nfse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+
+  evolution-postgres:
+    profiles: ["channel"]
+    image: postgres:16-alpine
+    container_name: nfse-evolution-postgres
+    environment:
+      POSTGRES_DB: ${EVOLUTION_POSTGRES_DB:-evolution_nfse}
+      POSTGRES_USER: ${EVOLUTION_POSTGRES_USER:-evolution_nfse}
+      POSTGRES_PASSWORD: ${EVOLUTION_POSTGRES_PASSWORD:?Defina EVOLUTION_POSTGRES_PASSWORD em .env.channel}
+    volumes:
+      - nfse_evolution_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${EVOLUTION_POSTGRES_USER:-evolution_nfse} -d ${EVOLUTION_POSTGRES_DB:-evolution_nfse}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+
+  evolution:
+    profiles: ["channel"]
+    image: ${EVOLUTION_IMAGE:-evoapicloud/evolution-api:v2.3.7}
+    container_name: nfse-evolution
+    depends_on:
+      evolution-postgres:
+        condition: service_healthy
+    ports:
+      - "8082:8080"
+    env_file:
+      - path: .env.channel
+        required: false
+    environment:
+      SERVER_URL: ${EVOLUTION_SERVER_URL:-http://localhost:8082}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?Defina EVOLUTION_API_KEY em .env.channel}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${EVOLUTION_POSTGRES_USER:-evolution_nfse}:${EVOLUTION_POSTGRES_PASSWORD}@evolution-postgres:5432/${EVOLUTION_POSTGRES_DB:-evolution_nfse}?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: nfse_evolution_v2
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      CONFIG_SESSION_PHONE_VERSION: ${EVOLUTION_WA_WEB_VERSION:-2.2413.51}
+      CONFIG_SESSION_PHONE_CLIENT: ${EVOLUTION_WA_PHONE_CLIENT:-Evolution API}
+      CONFIG_SESSION_PHONE_NAME: ${EVOLUTION_WA_PHONE_NAME:-Chrome}
+      LOG_BAILEYS: ${EVOLUTION_LOG_BAILEYS:-warn}
+      WEBSOCKET_ENABLED: ${EVOLUTION_WEBSOCKET_ENABLED:-true}
+      DOCKER_ENV: "true"
+    volumes:
+      - nfse_evolution_instances:/evolution/instances
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "require(\"http\").get(\"http://127.0.0.1:8080/\",r=>process.exit(r.statusCode&&r.statusCode<500?0:1)).on(\"error\",()=>process.exit(1));"',
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    restart: unless-stopped
+
+  n8n:
+    profiles: ["channel"]
+    image: n8nio/n8n:1.91.3
+    container_name: nfse-n8n
+    depends_on:
+      n8n-postgres:
+        condition: service_healthy
+      evolution:
+        condition: service_healthy
+    ports:
+      - "5680:5678"
+    env_file:
+      - path: .env.channel
+        required: false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: n8n-postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${N8N_POSTGRES_DB:-n8n_nfse}
+      DB_POSTGRESDB_USER: ${N8N_POSTGRES_USER:-n8n_nfse}
+      DB_POSTGRESDB_PASSWORD: ${N8N_POSTGRES_PASSWORD:?Defina N8N_POSTGRES_PASSWORD em .env.channel}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Defina N8N_ENCRYPTION_KEY em .env.channel}
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD:?Defina N8N_BASIC_AUTH_PASSWORD em .env.channel}
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5680/}
+      N8N_RUNNERS_ENABLED: "false"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      GENERIC_TIMEZONE: America/Sao_Paulo
+      # Core API (host — API roda fora do compose hoje)
+      EXEQ_API_BASE_URL: ${EXEQ_API_BASE_URL:-http://host.docker.internal:3002}
+      EXEQ_TENANT_SLUG: ${EXEQ_TENANT_SLUG:-piloto-sp}
+      EXEQ_CHANNEL_TOKEN: ${EXEQ_CHANNEL_TOKEN:-sandbox-channel-token-piloto}
+      CHANNEL_PAIRED_PHONE: ${CHANNEL_PAIRED_PHONE:-+5511973305448}
+      CHANNEL_E2E_PHONE: ${CHANNEL_E2E_PHONE:-+5511973857162}
+      # Evolution (rede interna do profile channel)
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL:-http://evolution:8080}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-nfse-piloto}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:?Defina EVOLUTION_API_KEY em .env.channel}
+    volumes:
+      - nfse_n8n_data:/home/node/.n8n
+      - ./workflows:/workflows:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "require(\"http\").get({hostname:\"127.0.0.1\",port:5678,path:\"/healthz\",headers:{Authorization:\"Basic \"+Buffer.from((process.env.N8N_BASIC_AUTH_USER||\"admin\")+\":\"+(process.env.N8N_BASIC_AUTH_PASSWORD||\"\")).toString(\"base64\")}},r=>process.exit(r.statusCode===200?0:1)).on(\"error\",()=>process.exit(1));"',
+        ]
+      interval: 20s
+      timeout: 15s
+      retries: 8
+      start_period: 90s
+    restart: unless-stopped
+
+volumes:
+  nfse_n8n_pgdata:
+  nfse_n8n_data:
+  nfse_evolution_pgdata:
+  nfse_evolution_instances:

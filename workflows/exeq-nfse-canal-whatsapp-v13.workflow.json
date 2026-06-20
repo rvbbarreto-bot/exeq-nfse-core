@@ -1,0 +1,209 @@
+{
+  "name": "exeq-nfse-canal-whatsapp-v13",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "exeq-nfse-whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-in",
+      "name": "WhatsApp Inbound",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "e08bf3ad-ffe5-43fc-bdb4-6fb05e814612"
+    },
+    {
+      "parameters": {
+        "jsCode": "const root = $input.first().json;\nconst body = root.body ?? root;\n\n// Payload já normalizado (smoke / teste manual)\nif (body.phone) {\n  return [{\n    json: {\n      body: {\n        phone: body.phone,\n        message_id: body.message_id ?? `wa-${Date.now()}`,\n        draft: body.draft ?? {},\n      },\n    },\n  }];\n}\n\n// Evolution API v2 — messages.upsert\nconst data = body.data ?? root.data ?? {};\nconst key = data.key ?? {};\nif (key.fromMe === true) {\n  return [];\n}\nconst jid = key.remoteJid ?? body.sender ?? '';\nconst digits = jid.replace(/@.*/, '').replace(/\\D/g, '');\nconst phone = digits ? `+${digits}` : '';\nif (!phone) {\n  throw new Error('Evolution payload sem telefone (remoteJid)');\n}\nreturn [{\n  json: {\n    body: {\n      phone,\n      message_id: key.id ?? `wa-${Date.now()}`,\n      draft: body.draft ?? {},\n    },\n  },\n}];"
+      },
+      "id": "map-evolution",
+      "name": "Map Evolution Inbound",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.EXEQ_API_BASE_URL}}/v1/channel/sessions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-tenant-slug", "value": "={{$env.EXEQ_TENANT_SLUG}}" },
+            { "name": "x-channel-token", "value": "={{$env.EXEQ_CHANNEL_TOKEN}}" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"phone_e164\": \"{{$json.body.phone}}\",\n  \"idempotency_key\": \"wa-{{$json.body.message_id}}\"\n}",
+        "options": {}
+      },
+      "id": "create-session",
+      "name": "API Create Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [560, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$env.EXEQ_API_BASE_URL}}/v1/channel/sessions/{{$json.session_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-tenant-slug", "value": "={{$env.EXEQ_TENANT_SLUG}}" },
+            { "name": "x-channel-token", "value": "={{$env.EXEQ_CHANNEL_TOKEN}}" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Map Evolution Inbound').item.json.body.draft }}",
+        "options": {}
+      },
+      "id": "collect-draft",
+      "name": "API Collect Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, session_id: $('API Create Session').item.json.session_id, status: $json.status } }}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 1 }] }
+      },
+      "id": "poll-notifications",
+      "name": "Poll Notifications",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 560]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.EXEQ_API_BASE_URL}}/v1/channel/notifications/pending",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-tenant-slug", "value": "={{$env.EXEQ_TENANT_SLUG}}" },
+            { "name": "x-channel-token", "value": "={{$env.EXEQ_CHANNEL_TOKEN}}" }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": false
+            }
+          }
+        }
+      },
+      "id": "fetch-pending",
+      "name": "API Pending Notifications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 560]
+    },
+    {
+      "parameters": {
+        "jsCode": "const root = $input.first().json;\nconst items = Array.isArray(root.items) ? root.items : [];\n\nif (items.length === 0) {\n  return [];\n}\n\nreturn items\n  .filter((item) => item?.id && item?.phone_e164 && item?.message_body)\n  .map((item) => ({ json: item }));"
+      },
+      "id": "expand-pending",
+      "name": "Expand Pending Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 560]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.EVOLUTION_API_URL}}/message/sendText/{{$env.EVOLUTION_INSTANCE}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.EVOLUTION_API_KEY}}" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { number: $json.phone_e164.replace(/^\\\\+/, ''), text: $json.message_body } }}",
+        "options": {}
+      },
+      "id": "send-whatsapp",
+      "name": "Evolution Send Text",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 560],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.EXEQ_API_BASE_URL}}/v1/channel/notifications/{{$('Expand Pending Items').item.json.id}}/ack",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-tenant-slug", "value": "={{$env.EXEQ_TENANT_SLUG}}" },
+            { "name": "x-channel-token", "value": "={{$env.EXEQ_CHANNEL_TOKEN}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ack-notification",
+      "name": "API Ack Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 560]
+    }
+  ],
+  "connections": {
+    "WhatsApp Inbound": {
+      "main": [[{ "node": "Map Evolution Inbound", "type": "main", "index": 0 }]]
+    },
+    "Map Evolution Inbound": {
+      "main": [[{ "node": "API Create Session", "type": "main", "index": 0 }]]
+    },
+    "API Create Session": {
+      "main": [[{ "node": "API Collect Draft", "type": "main", "index": 0 }]]
+    },
+    "API Collect Draft": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    },
+    "Poll Notifications": {
+      "main": [[{ "node": "API Pending Notifications", "type": "main", "index": 0 }]]
+    },
+    "API Pending Notifications": {
+      "main": [[{ "node": "Expand Pending Items", "type": "main", "index": 0 }]]
+    },
+    "Expand Pending Items": {
+      "main": [[{ "node": "Evolution Send Text", "type": "main", "index": 0 }]]
+    },
+    "Evolution Send Text": {
+      "main": [
+        [{ "node": "API Ack Notification", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": true,
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "description": "Canal WhatsApp fino — mapper Evolution + HTTP Request. Sem lógica fiscal (ADR-007)."
+  }
+}

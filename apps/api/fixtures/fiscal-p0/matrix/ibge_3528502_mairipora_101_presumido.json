@@ -1,0 +1,27 @@
+{
+  "schema": "exeq.fiscal_p0_fixture.v1",
+  "catalog_source": "CATALOGO_MUNICIPAL_PILOTO_v1_VALIDADO_2026-05-23.csv",
+  "input": {
+    "fiscal_profile_name": "Perfil Piloto SP",
+    "ibge_code": "3528502",
+    "municipio_nome": "Mairiporã",
+    "uf": "SP",
+    "service_code": "1.01",
+    "service_description": "Análise e desenvolvimento de sistemas",
+    "tax_regime": "lucro_presumido",
+    "competence_date": "2026-06-01"
+  },
+  "expected": {
+    "iss_rate": 0.02,
+    "iss_retained": false,
+    "irrf_rate": 0.015,
+    "pis_rate": 0.0065,
+    "cofins_rate": 0.03,
+    "csll_rate": 0.01
+  },
+  "metadata": {
+    "status_validacao": "VALIDADO_CONTADOR",
+    "observacao_contador": "LC 116 item 1.01 - Analise e desenvolvimento de sistemas. ISS 2% validado para Mairiporã. ISS retido=false para regra municipal padrao sem tomador substituto informado. Retencoes federais parametrizadas para Lucro Presumido quando tomador PJ estiver sujeito a retencao: IRRF 1,5% e CSRF 4,65% (PIS 0,65%, COFINS 3%, CSLL 1%). Validar excecoes, dispensa e perfil do tomador na emissao. Fonte ISS Mairipora: https://www.mairipora.sp.gov.br/wp-content/uploads/2023/01/ImprensaOficial_PMM_Edicao_875-site-2.pdf-D4Sign-28-12-2019-2.pdf (Lista: 1.01/1.06/1.07 = 2%).",
+    "priority": 100
+  }
+}

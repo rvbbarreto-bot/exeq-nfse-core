@@ -1,0 +1,171 @@
+{
+  "version": 1,
+  "validated_at": "2026-05-25",
+  "rules": [
+    {
+      "schema": "exeq.fiscal_p0_fixture.v1",
+      "catalog_source": "CR PO Sprint 15 — Santo André GissOnline",
+      "input": {
+        "fiscal_profile_name": "Perfil Piloto SP",
+        "ibge_code": "3547809",
+        "municipio_nome": "Santo André",
+        "uf": "SP",
+        "service_code": "1.01",
+        "service_description": "Análise e desenvolvimento de sistemas",
+        "tax_regime": "simples_nacional",
+        "competence_date": "2026-06-01"
+      },
+      "expected": {
+        "iss_rate": 0.02,
+        "iss_retained": false,
+        "irrf_rate": 0.0,
+        "pis_rate": 0.0,
+        "cofins_rate": 0.0,
+        "csll_rate": 0.0,
+        "simples_codigo_tributacao": 3
+      },
+      "metadata": {
+        "status_validacao": "VALIDADO_CONTADOR",
+        "observacao_contador": "Sprint 15 / CR PO 25-05-2026. LC 116 item 1.01. ISS 2% parametrizado para homolog piloto — validar lista GissOnline antes de producao.",
+        "priority": 100
+      }
+    },
+    {
+      "schema": "exeq.fiscal_p0_fixture.v1",
+      "catalog_source": "CR PO Sprint 15 — Santo André GissOnline",
+      "input": {
+        "fiscal_profile_name": "Perfil Piloto SP",
+        "ibge_code": "3547809",
+        "municipio_nome": "Santo André",
+        "uf": "SP",
+        "service_code": "1.01",
+        "service_description": "Análise e desenvolvimento de sistemas",
+        "tax_regime": "lucro_presumido",
+        "competence_date": "2026-06-01"
+      },
+      "expected": {
+        "iss_rate": 0.02,
+        "iss_retained": false,
+        "irrf_rate": 0.015,
+        "pis_rate": 0.0065,
+        "cofins_rate": 0.03,
+        "csll_rate": 0.01
+      },
+      "metadata": {
+        "status_validacao": "VALIDADO_CONTADOR",
+        "observacao_contador": "Sprint 15 — LP com retencoes federais padrao piloto.",
+        "priority": 100
+      }
+    },
+    {
+      "schema": "exeq.fiscal_p0_fixture.v1",
+      "catalog_source": "CR PO Sprint 15 — Santo André GissOnline",
+      "input": {
+        "fiscal_profile_name": "Perfil Piloto SP",
+        "ibge_code": "3547809",
+        "municipio_nome": "Santo André",
+        "uf": "SP",
+        "service_code": "1.06",
+        "service_description": "Consultoria em informática",
+        "tax_regime": "simples_nacional",
+        "competence_date": "2026-06-01"
+      },
+      "expected": {
+        "iss_rate": 0.02,
+        "iss_retained": false,
+        "irrf_rate": 0.0,
+        "pis_rate": 0.0,
+        "cofins_rate": 0.0,
+        "csll_rate": 0.0,
+        "simples_codigo_tributacao": 3
+      },
+      "metadata": {
+        "status_validacao": "VALIDADO_CONTADOR",
+        "observacao_contador": "Sprint 15 — item 1.06 consultoria informatica.",
+        "priority": 100
+      }
+    },
+    {
+      "schema": "exeq.fiscal_p0_fixture.v1",
+      "catalog_source": "CR PO Sprint 15 — Santo André GissOnline",
+      "input": {
+        "fiscal_profile_name": "Perfil Piloto SP",
+        "ibge_code": "3547809",
+        "municipio_nome": "Santo André",
+        "uf": "SP",
+        "service_code": "1.06",
+        "service_description": "Consultoria em informática",
+        "tax_regime": "lucro_presumido",
+        "competence_date": "2026-06-01"
+      },
+      "expected": {
+        "iss_rate": 0.02,
+        "iss_retained": false,
+        "irrf_rate": 0.015,
+        "pis_rate": 0.0065,
+        "cofins_rate": 0.03,
+        "csll_rate": 0.01
+      },
+      "metadata": {
+        "status_validacao": "VALIDADO_CONTADOR",
+        "observacao_contador": "Sprint 15 — LP 1.06.",
+        "priority": 100
+      }
+    },
+    {
+      "schema": "exeq.fiscal_p0_fixture.v1",
+      "catalog_source": "CR PO Sprint 15 — Santo André GissOnline",
+      "input": {
+        "fiscal_profile_name": "Perfil Piloto SP",
+        "ibge_code": "3547809",
+        "municipio_nome": "Santo André",
+        "uf": "SP",
+        "service_code": "1.07",
+        "service_description": "Suporte técnico em informática",
+        "tax_regime": "simples_nacional",
+        "competence_date": "2026-06-01"
+      },
+      "expected": {
+        "iss_rate": 0.02,
+        "iss_retained": false,
+        "irrf_rate": 0.0,
+        "pis_rate": 0.0,
+        "cofins_rate": 0.0,
+        "csll_rate": 0.0,
+        "simples_codigo_tributacao": 3
+      },
+      "metadata": {
+        "status_validacao": "VALIDADO_CONTADOR",
+        "observacao_contador": "Sprint 15 — item 1.07 suporte tecnico.",
+        "priority": 100
+      }
+    },
+    {
+      "schema": "exeq.fiscal_p0_fixture.v1",
+      "catalog_source": "CR PO Sprint 15 — Santo André GissOnline",
+      "input": {
+        "fiscal_profile_name": "Perfil Piloto SP",
+        "ibge_code": "3547809",
+        "municipio_nome": "Santo André",
+        "uf": "SP",
+        "service_code": "1.07",
+        "service_description": "Suporte técnico em informática",
+        "tax_regime": "lucro_presumido",
+        "competence_date": "2026-06-01"
+      },
+      "expected": {
+        "iss_rate": 0.02,
+        "iss_retained": false,
+        "irrf_rate": 0.015,
+        "pis_rate": 0.0065,
+        "cofins_rate": 0.03,
+        "csll_rate": 0.01
+      },
+      "metadata": {
+        "status_validacao": "VALIDADO_CONTADOR",
+        "observacao_contador": "Sprint 15 — LP 1.07.",
+        "priority": 100
+      }
+    }
+  ]
+}

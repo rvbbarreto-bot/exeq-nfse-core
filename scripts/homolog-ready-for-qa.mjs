@@ -29,7 +29,7 @@ const qaEnv = {
   GATEWAY_MOCK: process.env.GATEWAY_MOCK ?? "true",
   EVOLUTION_SERVER_URL:
     process.env.EVOLUTION_SERVER_URL ?? process.env.EVOLUTION_API_URL ?? "http://localhost:8082",
-  CHANNEL_DEBOUNCE_SECONDS: process.env.CHANNEL_DEBOUNCE_SECONDS ?? "8",
+  CHANNEL_DEBOUNCE_SECONDS: process.env.CHANNEL_DEBOUNCE_SECONDS ?? "40",
   ...(prodFocusProfile
     ? {
         EXEQ_FOCUS_PROFILE: "production",

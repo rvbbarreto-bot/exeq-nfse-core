@@ -26,7 +26,7 @@ const envSchema = z.object({
     .number()
     .int()
     .min(0)
-    .max(30)
+    .max(120)
     .default(process.env.NODE_ENV === "test" ? 0 : 8),
   /** LLM fallback quando parser regex não extrai campos (WhatsApp linguagem natural). */
   OPENAI_API_KEY: z.string().min(1).optional(),

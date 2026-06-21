@@ -32,6 +32,7 @@ const STOP_WORDS = new Set([
   "na",
   "nos",
   "nas",
+  "servico",
 ]);
 
 /** Sinônimos comuns em linguagem natural vs catálogo fiscal. */
@@ -55,35 +56,57 @@ export function normalizeServiceHint(value: string): string {
     .trim();
 }
 
-/** Tokens significativos do hint (com sinônimos) para busca fuzzy no catálogo. */
-export function expandServiceHintTokens(hint: string): string[] {
-  const normalized = normalizeServiceHint(hint);
-  const words = normalized.split(/\s+/).filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
-  const expanded = new Set<string>();
+/** Palavras significativas do hint (sem stopwords). */
+export function extractSignificantHintWords(hint: string): string[] {
+  let normalized = normalizeServiceHint(hint)
+    .replace(/^(?:o\s+)?servi[cç]o\s+(?:é|e)\s+(?:servi[cç]o\s+)?/i, "")
+    .replace(/^(?:servi[cç]o|servico)\s+/i, "")
+    .trim();
 
+  return normalized
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+}
+
+/** @deprecated Prefer extractSignificantHintWords + scoreServiceDescriptionForHint */
+export function expandServiceHintTokens(hint: string): string[] {
+  const words = extractSignificantHintWords(hint);
+  const expanded = new Set<string>();
   for (const word of words) {
     expanded.add(word);
     for (const synonym of TOKEN_SYNONYMS[word] ?? []) {
       expanded.add(normalizeServiceHint(synonym));
     }
   }
-
   return [...expanded];
 }
 
-export function scoreServiceDescription(description: string, tokens: string[]): number {
-  if (tokens.length === 0) return 0;
+/** Pontua quantas palavras significativas do hint casam na descrição (com sinônimos). */
+export function scoreServiceDescriptionForHint(
+  description: string,
+  significantWords: string[],
+): number {
+  if (significantWords.length === 0) return 0;
   const desc = normalizeServiceHint(description);
   let score = 0;
-  for (const token of tokens) {
-    if (desc.includes(token)) score += 1;
+  for (const word of significantWords) {
+    const variants = new Set<string>([word]);
+    for (const synonym of TOKEN_SYNONYMS[word] ?? []) {
+      variants.add(normalizeServiceHint(synonym));
+    }
+    if ([...variants].some((v) => desc.includes(v))) score += 1;
   }
   return score;
 }
 
-function minScoreForTokens(tokenCount: number): number {
-  if (tokenCount <= 1) return 1;
-  return Math.max(2, Math.ceil(tokenCount * 0.6));
+/** @deprecated */
+export function scoreServiceDescription(description: string, tokens: string[]): number {
+  return scoreServiceDescriptionForHint(description, extractSignificantHintWords(tokens.join(" ")));
+}
+
+export function minScoreForSignificantWords(wordCount: number): number {
+  if (wordCount <= 1) return 1;
+  return wordCount;
 }
 
 async function loadActiveServices(db: Sql, tenantId: string): Promise<ServiceCatalogMatch[]> {
@@ -97,13 +120,16 @@ async function loadActiveServices(db: Sql, tenantId: string): Promise<ServiceCat
 
 function rankByHintTokens(
   services: ServiceCatalogMatch[],
-  tokens: string[],
+  hint: string,
 ): ServiceCatalogMatch[] {
-  const minScore = minScoreForTokens(tokens.length);
+  const words = extractSignificantHintWords(hint);
+  if (words.length === 0) return [];
+
+  const minScore = minScoreForSignificantWords(words.length);
   const ranked = services
     .map((service) => ({
       service,
-      score: scoreServiceDescription(service.description, tokens),
+      score: scoreServiceDescriptionForHint(service.description, words),
     }))
     .filter((row) => row.score >= minScore)
     .sort((a, b) => b.score - a.score || a.service.service_code.localeCompare(b.service.service_code));
@@ -145,11 +171,11 @@ export async function findServicesByHint(
 
   if (phraseMatches.length > 0) return phraseMatches;
 
-  const tokens = expandServiceHintTokens(hint);
-  if (tokens.length === 0) return [];
+  const words = extractSignificantHintWords(hint);
+  if (words.length === 0) return [];
 
   const allServices = await loadActiveServices(db, tenantId);
-  return rankByHintTokens(allServices, tokens).slice(0, limit);
+  return rankByHintTokens(allServices, hint).slice(0, limit);
 }
 
 export async function resolveServiceFromHint(

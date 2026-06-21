@@ -110,7 +110,8 @@ export async function resolveChannelDraftIds(
     if (serviceId) {
       next.service_id = serviceId;
     } else {
-      promoteInvalidServiceCodeToHint(next);
+      // Código fiscal válido mas ausente no catálogo — não bloquear resolução por hint.
+      delete next.service_code;
     }
   }
 
@@ -124,6 +125,12 @@ export async function resolveChannelDraftIds(
     if (resolved.service_id) {
       next.service_id = resolved.service_id;
       if (resolved.service_code) next.service_code = resolved.service_code;
+      if (next.conversation_flags?.service_ambiguous_options) {
+        next.conversation_flags = {
+          ...next.conversation_flags,
+          service_ambiguous_options: undefined,
+        };
+      }
     } else if (resolved.ambiguous_matches?.length) {
       next.conversation_flags = {
         ...next.conversation_flags,

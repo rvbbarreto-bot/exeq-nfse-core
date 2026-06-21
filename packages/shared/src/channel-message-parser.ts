@@ -4,13 +4,16 @@ import {
   buildV11aMissingReply,
   extractLabeledChannelFields,
   getMissingV11aFields,
+  onlyDigits,
   parseAmountCentsFromLabel,
+  parseAmountCentsFromFreeformText,
   parseCompetenceIsoFromLabel,
   type ChannelLabeledFields,
 } from "./channel-labeled-parser.js";
 import {
   type ChannelMessageIntent,
   type ParsedChannelMessage,
+  parseServicePrefixText,
   patchFromContextualMessage,
   patchSingleMissingField,
 } from "./channel-conversation.js";
@@ -24,6 +27,7 @@ export {
   buildShortGreetingAck,
   firstName,
   isConversationStarted,
+  parseServicePrefixText,
   patchFromContextualMessage,
   patchSingleMissingField,
 } from "./channel-conversation.js";
@@ -45,6 +49,9 @@ const REPEAT_LAST_RE =
   /^(sim[,!.]?\s*)?(mesmos?\s*dados|repetir|igual\s+a\s+ultima|igual\s+anterior|ultima\s+nota|mesma\s+nota|pode\s+ser|isso|confirmo)/i;
 
 function parseDescription(text: string): string | undefined {
+  const servicePrefix = parseServicePrefixText(text);
+  if (servicePrefix?.description) return servicePrefix.description;
+
   const labeled = text.match(/(?:descri[cç][aã]o|servi[cç]o|servico)\s*[:\-]\s*(.+)$/i);
   if (labeled?.[1]?.trim()) return labeled[1].trim().slice(0, 2000);
   const free = text.match(/^emitir\s+(.+)$/i);
@@ -139,10 +146,17 @@ export function parseChannelMessageText(
   }
 
   const patch: Partial<ChannelDraft> = {};
-  const amount = parseAmountCentsFromLabel(normalized);
+  const formattedDoc = normalized.match(/\b[\d./-]{14,22}\b/);
+  if (formattedDoc?.[0]) {
+    const doc = onlyDigits(formattedDoc[0]);
+    if (doc.length === 11 || doc.length === 14) patch.tomador_document = doc;
+  }
+  const amount = parseAmountCentsFromFreeformText(normalized);
   if (amount != null && amount > 0) patch.amount_cents = amount;
   const description = parseDescription(normalized);
   if (description) patch.description = description;
+  const servicePrefixInline = parseServicePrefixText(normalized);
+  if (servicePrefixInline?.service_hint) patch.service_hint = servicePrefixInline.service_hint;
   const competence = parseCompetenceIsoFromLabel(normalized);
   if (competence) patch.competence_date = competence;
   const ibge = resolveMunicipioIbgeFromText(normalized);
@@ -150,6 +164,11 @@ export function parseChannelMessageText(
 
   if (Object.keys(patch).length > 0) {
     return { intent: "inform", patch };
+  }
+
+  const servicePrefix = parseServicePrefixText(normalized);
+  if (servicePrefix && Object.keys(servicePrefix).length > 0) {
+    return { intent: "inform", patch: servicePrefix };
   }
 
   if (EMISSION_INTENT_RE.test(normalized)) {

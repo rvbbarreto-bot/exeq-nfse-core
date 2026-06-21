@@ -100,4 +100,20 @@ describe("channel-conversation multi-mensagem", () => {
     expect(msg).toContain("João");
     expect(msg).toContain("mesmos dados");
   });
+
+  it("acumula serviço livre quando V11A já completo e falta service_id", () => {
+    const draft = {
+      tomador_name: "Empresa Alpha",
+      tomador_document: "56004031000175",
+      amount_cents: 123400,
+      description: "Consultoria",
+      competence_date: "2026-06-18",
+      service_code: "1.01",
+      ibge_code: "3504107",
+      service_id: undefined,
+    };
+    const patch = patchFromContextualMessage("serviço desenvolvimento de software", draft);
+    expect(patch.service_hint).toBe("desenvolvimento de software");
+    expect(patch.description).toBe("desenvolvimento de software");
+  });
 });

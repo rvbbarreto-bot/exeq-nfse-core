@@ -147,6 +147,21 @@ export function parseAmountCentsFromLabel(value: string | undefined): number | u
   return undefined;
 }
 
+/** Valor em texto livre — prioriza rótulo "valor" e ignora CNPJ/CPF formatado na linha. */
+export function parseAmountCentsFromFreeformText(text: string | undefined): number | undefined {
+  const s = String(text ?? "").trim();
+  if (!s) return undefined;
+
+  const labeled = s.match(/\bvalor\s*[:\-]?\s*((?:r\$\s*)?\d[\d.,]*)/i);
+  if (labeled?.[1]) {
+    const fromLabel = parseAmountCentsFromLabel(labeled[1]);
+    if (fromLabel != null && fromLabel > 0) return fromLabel;
+  }
+
+  const withoutDoc = s.replace(/\b[\d./-]{14,22}\b/g, " ");
+  return parseAmountCentsFromLabel(withoutDoc);
+}
+
 export function parseCompetenceIsoFromLabel(
   value: string | undefined,
   referenceDate: Date = new Date(),

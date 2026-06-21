@@ -402,10 +402,17 @@ export async function processChannelInbound(
 
   if (
     consolidated.socialOnly &&
-    (consolidated.trailingSocialIntent === "greeting" ||
-      consolidated.intents.every((i) => i === "greeting" || i === "unknown"))
+    consolidated.trailingSocialIntent === "greeting" &&
+    consolidated.intents.every((i) => i === "greeting")
   ) {
     if (isConversationStarted(currentDraft)) {
+      const active = await getChannelSession(db, tenantId, session.id);
+      if (active.missing_fields.length > 0) {
+        const reply = missingListAlreadySent(active.draft_payload)
+          ? buildContinuesListeningReply(displayName ?? undefined)
+          : collectReplyForSession(active, replyOpts);
+        return finish({ status: active.status, reply_text: reply, emitted: false });
+      }
       return finish({
         status: session.status,
         reply_text: buildShortGreetingAck(displayName ?? undefined),
@@ -474,7 +481,7 @@ export async function processChannelInbound(
   }
 
   const unknownReply = missingListAlreadySent(current.draft_payload)
-    ? `${buildShortGreetingAck(displayName ?? undefined)}\n\nNão entendi esta mensagem. Pode enviar um dado por vez (valor, documento, cidade…).\n\nDigite *ajuda* se precisar.`
+    ? `${buildContinuesListeningReply(displayName ?? undefined)}\n\nNão entendi esta mensagem. Pode enviar um dado por vez (valor, documento, cidade, serviço…).\n\nDigite *ajuda* se precisar.`
     : `${buildShortGreetingAck(displayName ?? undefined)}\n\nNão entendi esta mensagem. ${collectReplyForSession(current, replyOpts)}\n\nDigite *ajuda* se precisar.`;
 
   return finish({

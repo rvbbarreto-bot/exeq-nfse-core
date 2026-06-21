@@ -4,6 +4,7 @@ import {
   getMissingV11aFields,
   onlyDigits,
   parseAmountCentsFromLabel,
+  parseAmountCentsFromFreeformText,
   parseCompetenceIsoFromLabel,
   type ChannelLabeledFields,
 } from "./channel-labeled-parser.js";
@@ -70,6 +71,12 @@ function extractTomadorDocument(text: string): string | undefined {
   const docOnly = text.match(/\b(\d{11}|\d{14})\b/);
   if (docOnly?.[1]) return docOnly[1];
 
+  const formatted = text.match(/\b[\d./-]{14,22}\b/);
+  if (formatted?.[0]) {
+    const doc = onlyDigits(formatted[0]);
+    if (doc.length === 11 || doc.length === 14) return doc;
+  }
+
   return undefined;
 }
 
@@ -78,7 +85,19 @@ function extractServiceCode(text: string): string | undefined {
   return m?.[1]?.replace(/\s/g, "");
 }
 
+/** "serviço desenvolvimento de software" → hint/descrição (sem dois-pontos). */
+export function parseServicePrefixText(text: string): Partial<ChannelDraft> | null {
+  const m = normalizeText(text).match(/^(?:servi[cç]o|servico)\s+(.+)$/i);
+  const hint = m?.[1]?.trim();
+  if (!hint || hint.length < 3) return null;
+  const clipped = hint.slice(0, 2000);
+  return { service_hint: clipped.slice(0, 255), description: clipped };
+}
+
 function extractDescriptionFreeform(text: string): string | undefined {
+  const servicePrefix = parseServicePrefixText(text);
+  if (servicePrefix?.description) return servicePrefix.description;
+
   const labeled = text.match(/(?:descri[cç][aã]o|servi[cç]o)\s*[:\-]\s*(.+)$/i);
   if (labeled?.[1]?.trim()) return labeled[1].trim().slice(0, 2000);
   if (text.length >= 8 && !GREETING_RE.test(text) && !EMISSION_INTENT_RE.test(text)) {
@@ -98,12 +117,20 @@ export function patchFromContextualMessage(
   if (!normalized) return {};
 
   const missing = getMissingV11aFields(draftToLabeled(draft));
-  if (missing.length === 0) return {};
+  if (missing.length === 0) {
+    if (!draft.service_id) {
+      const servicePrefix = parseServicePrefixText(normalized);
+      if (servicePrefix && Object.keys(servicePrefix).length > 0) {
+        return servicePrefix;
+      }
+    }
+    return {};
+  }
 
   const patch: Partial<ChannelDraft> = {};
 
   if (missing.includes("amount_label")) {
-    const cents = parseAmountCentsFromLabel(normalized);
+    const cents = parseAmountCentsFromFreeformText(normalized);
     if (cents != null && cents > 0) patch.amount_cents = cents;
   }
 
@@ -125,15 +152,32 @@ export function patchFromContextualMessage(
   if (missing.includes("service_code")) {
     const code = extractServiceCode(normalized);
     if (code) patch.service_code = code;
+    else {
+      const servicePrefix = parseServicePrefixText(normalized);
+      if (servicePrefix?.service_hint) {
+        patch.service_hint = servicePrefix.service_hint;
+        if (servicePrefix.description) patch.description = servicePrefix.description;
+      }
+    }
   }
 
   if (missing.includes("description")) {
     const desc = extractDescriptionFreeform(normalized);
     if (desc) patch.description = desc;
+    else {
+      const servicePrefix = parseServicePrefixText(normalized);
+      if (servicePrefix?.description) patch.description = servicePrefix.description;
+      if (servicePrefix?.service_hint) patch.service_hint = servicePrefix.service_hint;
+    }
   }
 
   if (missing.includes("tomador_name") && missing.length === 1) {
-    if (!GREETING_RE.test(normalized) && !EMISSION_INTENT_RE.test(normalized) && !normalized.includes(":")) {
+    if (
+      !parseServicePrefixText(normalized) &&
+      !GREETING_RE.test(normalized) &&
+      !EMISSION_INTENT_RE.test(normalized) &&
+      !normalized.includes(":")
+    ) {
       patch.tomador_name = normalized.slice(0, 255);
     }
   }
@@ -161,6 +205,7 @@ export function patchSingleMissingField(
 
   switch (field) {
     case "tomador_name":
+      if (parseServicePrefixText(value)) return null;
       patch.tomador_name = value.slice(0, 255);
       break;
     case "tomador_document": {
@@ -184,9 +229,16 @@ export function patchSingleMissingField(
       else return null;
       break;
     }
-    case "service_code":
-      patch.service_code = value.replace(/\s/g, "");
+    case "service_code": {
+      const servicePrefix = parseServicePrefixText(value);
+      if (servicePrefix?.service_hint) {
+        patch.service_hint = servicePrefix.service_hint;
+        if (servicePrefix.description) patch.description = servicePrefix.description;
+      } else {
+        patch.service_code = value.replace(/\s/g, "");
+      }
       break;
+    }
     case "ibge_code": {
       const ibge = onlyDigits(value);
       if (ibge.length === 7) patch.ibge_code = ibge;
@@ -219,6 +271,7 @@ export function isConversationStarted(draft: ChannelDraft): boolean {
       draft.description ||
       draft.competence_date ||
       draft.service_code ||
+      draft.service_hint ||
       draft.ibge_code,
   );
 }

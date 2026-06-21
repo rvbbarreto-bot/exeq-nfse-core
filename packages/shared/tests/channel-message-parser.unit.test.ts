@@ -49,4 +49,19 @@ describe("channel-message-parser", () => {
     expect(msg).toContain("confirmar");
     expect(msg).toContain("R$ 1.00");
   });
+
+  it("extrai CNPJ formatado e valor em mensagem livre", () => {
+    const r = parseChannelMessageText("56.004.031/0001-75, valor 1.234,00 cidade atibaia.");
+    expect(r.intent).toBe("inform");
+    expect(r.patch.tomador_document).toBe("56004031000175");
+    expect(r.patch.amount_cents).toBe(123400);
+    expect(r.patch.ibge_code).toBe("3504107");
+  });
+
+  it('extrai serviço com prefixo "serviço …" sem dois-pontos', () => {
+    const r = parseChannelMessageText("serviço desenvolvimento de software");
+    expect(r.intent).toBe("inform");
+    expect(r.patch.service_hint).toBe("desenvolvimento de software");
+    expect(r.patch.description).toBe("desenvolvimento de software");
+  });
 });

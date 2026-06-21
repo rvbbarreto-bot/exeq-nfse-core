@@ -53,4 +53,26 @@ describe("M0.3 parseConsolidatedChannelMessages", () => {
     expect(r.intents).toEqual(["greeting"]);
     expect(r.socialOnly).toBe(true);
   });
+
+  it("consolida lote PO: valor, cidade e serviço natural", () => {
+    const text = [
+      "olá",
+      "quero emitir mais uma nf",
+      "quero uma nota no valor de 1.234,00",
+      "cidade Atibaia",
+      "serviço desenvolvimento de software",
+    ].join("\n");
+
+    const r = parseConsolidatedChannelMessages(text);
+    expect(r.mergedPatch.amount_cents).toBe(123400);
+    expect(r.mergedPatch.ibge_code).toBe("3504107");
+    expect(r.mergedPatch.service_hint).toBe("desenvolvimento de software");
+    expect(r.socialOnly).toBe(false);
+  });
+
+  it("recupera serviço em linha classificada como unknown", () => {
+    const text = ["bom dia", "o serviço é serviço desenvolvimento de software"].join("\n");
+    const r = parseConsolidatedChannelMessages(text);
+    expect(r.mergedPatch.service_hint).toBe("desenvolvimento de software");
+  });
 });

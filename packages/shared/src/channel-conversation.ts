@@ -48,6 +48,13 @@ function normalizeText(text: string): string {
 }
 
 function draftToLabeled(draft: ChannelDraft): ChannelLabeledFields {
+  const serviceCode =
+    draft.service_code && looksLikeFiscalServiceCode(draft.service_code)
+      ? draft.service_code
+      : draft.service_hint
+        ? draft.service_hint
+        : draft.service_code;
+
   return {
     tomador_name: draft.tomador_name,
     tomador_document: draft.tomador_document,
@@ -57,9 +64,16 @@ function draftToLabeled(draft: ChannelDraft): ChannelLabeledFields {
         : undefined,
     description: draft.description,
     competence_label: draft.competence_date,
-    service_code: draft.service_code,
+    service_code: serviceCode,
     ibge_code: draft.ibge_code,
   };
+}
+
+/** Código fiscal LC116 (ex.: 1.01, 01.07.01) — distingue de texto livre. */
+export function looksLikeFiscalServiceCode(value: string | undefined): boolean {
+  const raw = String(value ?? "").trim().replace(/\s/g, "");
+  if (!raw) return false;
+  return /^\d{1,2}(\.\d{2}){1,2}$/.test(raw) || /^\d\.\d{2}$/.test(raw);
 }
 
 function extractTomadorDocument(text: string): string | undefined {
@@ -85,13 +99,30 @@ function extractServiceCode(text: string): string | undefined {
   return m?.[1]?.replace(/\s/g, "");
 }
 
-/** "serviço desenvolvimento de software" → hint/descrição (sem dois-pontos). */
+/** "serviço desenvolvimento de software" / "o serviço é …" → hint/descrição. */
 export function parseServicePrefixText(text: string): Partial<ChannelDraft> | null {
-  const m = normalizeText(text).match(/^(?:servi[cç]o|servico)\s+(.+)$/i);
-  const hint = m?.[1]?.trim();
-  if (!hint || hint.length < 3) return null;
-  const clipped = hint.slice(0, 2000);
-  return { service_hint: clipped.slice(0, 255), description: clipped };
+  const normalized = normalizeText(text);
+
+  const patterns = [
+    /^(?:o\s+)?servi[cç]o\s+(?:é|e)\s+(?:servi[cç]o|servico)\s+(.+)$/i,
+    /^(?:servi[cç]o|servico)\s+(?:é|e)\s+(?:servi[cç]o|servico)\s+(.+)$/i,
+    /^(?:o\s+)?servi[cç]o\s+(?:é|e)\s+(.+)$/i,
+    /^(?:servi[cç]o|servico)\s+(?:é|e)\s+(.+)$/i,
+    /^(?:servi[cç]o|servico)\s+(.+)$/i,
+  ];
+
+  for (const re of patterns) {
+    const hint = re.exec(normalized)?.[1]?.trim();
+    if (!hint || hint.length < 3) continue;
+    const cleaned = hint.replace(/^(?:servi[cç]o|servico)\s+/i, "").trim();
+    const finalHint = (cleaned.length >= 3 ? cleaned : hint).slice(0, 2000);
+    return {
+      service_hint: finalHint.slice(0, 255),
+      description: finalHint,
+    };
+  }
+
+  return null;
 }
 
 function extractDescriptionFreeform(text: string): string | undefined {
@@ -100,6 +131,9 @@ function extractDescriptionFreeform(text: string): string | undefined {
 
   const labeled = text.match(/(?:descri[cç][aã]o|servi[cç]o)\s*[:\-]\s*(.+)$/i);
   if (labeled?.[1]?.trim()) return labeled[1].trim().slice(0, 2000);
+
+  if (/\b(?:servi[cç]o|servico)\b/i.test(text)) return undefined;
+
   if (text.length >= 8 && !GREETING_RE.test(text) && !EMISSION_INTENT_RE.test(text)) {
     if (!extractTomadorDocument(text) && !parseAmountCentsFromLabel(text)) {
       return text.slice(0, 2000);

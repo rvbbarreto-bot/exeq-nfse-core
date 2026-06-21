@@ -116,4 +116,21 @@ describe("channel-conversation multi-mensagem", () => {
     expect(patch.service_hint).toBe("desenvolvimento de software");
     expect(patch.description).toBe("desenvolvimento de software");
   });
+
+  it("aceita frase natural o serviço é … quando falta service_id", () => {
+    const draft = {
+      tomador_name: "Empresa Alpha",
+      tomador_document: "56004031000175",
+      amount_cents: 123400,
+      description: "Consultoria",
+      competence_date: "2026-06-18",
+      service_code: "1.01",
+      ibge_code: "3504107",
+    };
+    const patch = patchFromContextualMessage(
+      "o serviço é serviço desenvolvimento de software",
+      draft,
+    );
+    expect(patch.service_hint).toBe("desenvolvimento de software");
+  });
 });

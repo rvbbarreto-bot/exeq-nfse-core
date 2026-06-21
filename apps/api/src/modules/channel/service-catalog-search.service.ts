@@ -159,6 +159,23 @@ export async function resolveServiceFromHint(
 ): Promise<ServiceHintResolution> {
   const matches = await findServicesByHint(db, tenantId, hint, 5);
   if (matches.length === 0) return {};
+
+  const uniqueIds = new Set(matches.map((m) => m.id));
+  if (uniqueIds.size === 1) {
+    return {
+      service_id: matches[0]!.id,
+      service_code: matches[0]!.service_code,
+    };
+  }
+
+  const uniqueCodes = new Set(matches.map((m) => m.service_code));
+  if (uniqueCodes.size === 1) {
+    return {
+      service_id: matches[0]!.id,
+      service_code: matches[0]!.service_code,
+    };
+  }
+
   if (matches.length === 1) {
     return {
       service_id: matches[0]!.id,

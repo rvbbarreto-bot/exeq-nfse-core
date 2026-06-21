@@ -9,6 +9,7 @@ import {
   buildShortGreetingAck,
   isConversationStarted,
   parseConsolidatedChannelMessages,
+  parseServicePrefixText,
 } from "@exeq/shared";
 import type { ChannelDraft } from "@exeq/shared";
 import type { Sql } from "../../db/client.js";
@@ -476,6 +477,27 @@ export async function processChannelInbound(
     return finish({
       status: current.status,
       reply_text: buildGreetingReply(displayName ?? undefined, hasLastEmission),
+      emitted: false,
+    });
+  }
+
+  const rescueHint = parseServicePrefixText(messageText);
+  if (rescueHint?.service_hint) {
+    await mergeAndResolveDraft(db, tenantId, session.id, {
+      ...rescueHint,
+      conversation_flags: withConversationFlags(current.draft_payload, {
+        greeted: true,
+        missing_list_sent: true,
+      }),
+    });
+    const rescued = await getChannelSession(db, tenantId, session.id);
+    const ambiguity = serviceAmbiguityReply(rescued.draft_payload);
+    if (ambiguity) {
+      return finish({ status: rescued.status, reply_text: ambiguity, emitted: false });
+    }
+    return finish({
+      status: rescued.status,
+      reply_text: collectReplyForSession(rescued, replyOpts),
       emitted: false,
     });
   }

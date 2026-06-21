@@ -64,4 +64,10 @@ describe("channel-message-parser", () => {
     expect(r.patch.service_hint).toBe("desenvolvimento de software");
     expect(r.patch.description).toBe("desenvolvimento de software");
   });
+
+  it('extrai "o serviço é serviço …" em linguagem natural', () => {
+    const r = parseChannelMessageText("o serviço é serviço desenvolvimento de software");
+    expect(r.intent).toBe("inform");
+    expect(r.patch.service_hint).toBe("desenvolvimento de software");
+  });
 });

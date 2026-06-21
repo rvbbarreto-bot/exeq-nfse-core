@@ -27,6 +27,7 @@ export {
   buildShortGreetingAck,
   firstName,
   isConversationStarted,
+  looksLikeFiscalServiceCode,
   parseServicePrefixText,
   patchFromContextualMessage,
   patchSingleMissingField,

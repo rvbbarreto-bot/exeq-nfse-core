@@ -22,4 +22,9 @@ describe("service-catalog-search", () => {
     const score = scoreServiceDescription("Analise e desenvolvimento de sistemas", tokens);
     expect(score).toBeGreaterThanOrEqual(2);
   });
+
+  it("sinônimo software casa com sistemas no catálogo", () => {
+    const tokens = expandServiceHintTokens("software");
+    expect(scoreServiceDescription("Analise e desenvolvimento de sistemas", tokens)).toBeGreaterThan(0);
+  });
 });

@@ -2,6 +2,7 @@ import type { ChannelDraft } from "./channel.js";
 import {
   type ChannelMessageIntent,
   type ParsedChannelMessage,
+  parseServicePrefixText,
   parseChannelMessageText,
 } from "./channel-message-parser.js";
 
@@ -97,6 +98,19 @@ export function parseConsolidatedChannelMessages(
       trailingSocialIntent = parsed.intent;
     } else if (parsed.intent === "emission_intent") {
       trailingSocialIntent = "emission_intent";
+    }
+  }
+
+  if (!mergedPatch.service_hint) {
+    for (const line of lines) {
+      const serviceHint = parseServicePrefixText(line);
+      if (serviceHint?.service_hint) {
+        Object.assign(mergedPatch, serviceHint);
+        rollingDraft = mergeDraft(rollingDraft, serviceHint);
+        dataLines += 1;
+        trailingSocialIntent = null;
+        break;
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 import type { ChannelDraft } from "@exeq/shared";
 import {
+  looksLikeFiscalServiceCode,
   normalizeIbge,
   normalizeServiceCode,
   onlyDigits,
@@ -52,6 +53,12 @@ export async function findServiceIdByCode(
   return null;
 }
 
+function promoteInvalidServiceCodeToHint(next: ChannelDraft): void {
+  if (!next.service_code || looksLikeFiscalServiceCode(next.service_code)) return;
+  if (!next.service_hint) next.service_hint = next.service_code.slice(0, 255);
+  delete next.service_code;
+}
+
 /** Resolve tomador/serviço a partir dos campos V11A no draft (lookup ou create tomador). */
 export async function resolveChannelDraftIds(
   db: Sql,
@@ -59,6 +66,8 @@ export async function resolveChannelDraftIds(
   draft: ChannelDraft,
 ): Promise<ChannelDraft> {
   const next: ChannelDraft = { ...draft };
+
+  promoteInvalidServiceCodeToHint(next);
 
   if (!next.customer_id && next.tomador_document && next.tomador_name) {
     const doc = onlyDigits(next.tomador_document);
@@ -98,7 +107,11 @@ export async function resolveChannelDraftIds(
 
   if (!next.service_id && next.service_code) {
     const serviceId = await findServiceIdByCode(db, tenantId, next.service_code);
-    if (serviceId) next.service_id = serviceId;
+    if (serviceId) {
+      next.service_id = serviceId;
+    } else {
+      promoteInvalidServiceCodeToHint(next);
+    }
   }
 
   if (!next.ibge_code && next.city_hint) {

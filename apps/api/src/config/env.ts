@@ -28,6 +28,15 @@ const envSchema = z.object({
     .min(0)
     .max(30)
     .default(process.env.NODE_ENV === "test" ? 0 : 8),
+  /** LLM fallback quando parser regex não extrai campos (WhatsApp linguagem natural). */
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  LLM_EXTRACTION_MODEL: z.string().default("gpt-4o-mini"),
+  LLM_CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.5),
+  CHANNEL_LLM_FALLBACK_ENABLED: z
+    .enum(["true", "false"])
+    .default(process.env.NODE_ENV === "test" ? "false" : "true")
+    .transform((v) => v === "true"),
+  LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
   /** Resposta WhatsApp após debounce — host usa EVOLUTION_SERVER_URL (8082). */
   EVOLUTION_SERVER_URL: z.string().url().optional(),
   EVOLUTION_API_URL: z.string().url().optional(),

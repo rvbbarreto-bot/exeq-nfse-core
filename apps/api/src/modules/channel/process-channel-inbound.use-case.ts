@@ -4,12 +4,15 @@ import {
   buildContinuesListeningReply,
   buildEmissionIntentReply,
   buildGreetingReply,
+  buildPendingReviewReply,
+  buildServiceAmbiguityReply,
   buildShortGreetingAck,
   isConversationStarted,
   parseConsolidatedChannelMessages,
 } from "@exeq/shared";
 import type { ChannelDraft } from "@exeq/shared";
 import type { Sql } from "../../db/client.js";
+import { env } from "../../config/env.js";
 import {
   cloneRepeatableDraft,
   getChannelContact,
@@ -24,8 +27,17 @@ import {
   createChannelSession,
   findActiveChannelSessionByPhone,
   getChannelSession,
+  setChannelSessionPendingReview,
 } from "./channel.service.js";
 import { confirmChannelSession } from "./confirm-channel-session.use-case.js";
+import {
+  extractFieldsWithLlm,
+  fetchRecentConversationHistory,
+  llmOutputToRawDraftPatch,
+  recordLlmLog,
+  shouldAttemptLlmFallback,
+  type LlmExtractionOutput,
+} from "./llm-extraction.service.js";
 
 export type ProcessChannelInboundInput = {
   phone_e164: string;
@@ -111,6 +123,74 @@ function missingListAlreadySent(draft: ChannelDraft): boolean {
   return draft.conversation_flags?.missing_list_sent === true;
 }
 
+function serviceAmbiguityReply(draft: ChannelDraft): string | null {
+  const options = draft.conversation_flags?.service_ambiguous_options;
+  if (!options?.length) return null;
+  return buildServiceAmbiguityReply(options);
+}
+
+async function tryLlmExtractionFallback(
+  db: Sql,
+  tenantId: string,
+  sessionId: string,
+  input: ProcessChannelInboundInput,
+  messageText: string,
+  currentDraft: ChannelDraft,
+  consolidated: ReturnType<typeof parseConsolidatedChannelMessages>,
+): Promise<{
+  consolidated: ReturnType<typeof parseConsolidatedChannelMessages>;
+  llmOutput: LlmExtractionOutput | null;
+  pendingReview: boolean;
+}> {
+  if (
+    !shouldAttemptLlmFallback(messageText, Object.keys(consolidated.mergedPatch).length, {
+      hasConfirm: consolidated.hasConfirm,
+      hasCancel: consolidated.hasCancel,
+      hasHelp: consolidated.hasHelp,
+      socialOnly: consolidated.socialOnly,
+      intents: consolidated.intents,
+    })
+  ) {
+    return { consolidated, llmOutput: null, pendingReview: false };
+  }
+
+  try {
+    const history = await fetchRecentConversationHistory(db, tenantId, sessionId);
+    const llmInput = {
+      consolidated_text: messageText,
+      current_draft: currentDraft,
+      conversation_history: history,
+    };
+    const llmOutput = await extractFieldsWithLlm(llmInput);
+    await recordLlmLog(db, tenantId, sessionId, llmInput, llmOutput, {
+      message_id: input.message_id,
+    });
+
+    const lowConfidence = llmOutput.confidence_score < env.LLM_CONFIDENCE_THRESHOLD;
+    if (lowConfidence || llmOutput.ambiguous_fields.length > 0) {
+      await setChannelSessionPendingReview(db, tenantId, sessionId);
+      return { consolidated, llmOutput, pendingReview: true };
+    }
+
+    const llmPatch = llmOutputToRawDraftPatch(llmOutput);
+    const next = { ...consolidated };
+
+    if (llmOutput.intent === "confirm") next.hasConfirm = true;
+    if (llmOutput.intent === "cancel") next.hasCancel = true;
+    if (llmOutput.intent === "help") next.hasHelp = true;
+
+    if (Object.keys(llmPatch).length > 0) {
+      next.mergedPatch = { ...consolidated.mergedPatch, ...llmPatch };
+      next.socialOnly = false;
+    }
+
+    return { consolidated: next, llmOutput, pendingReview: false };
+  } catch (err) {
+    console.error("[channel-llm] extraction failed:", err);
+    return { consolidated, llmOutput: null, pendingReview: false };
+  }
+}
+
 export async function processChannelInbound(
   db: Sql,
   tenantId: string,
@@ -159,10 +239,6 @@ export async function processChannelInbound(
   }
 
   const currentDraft = (await getChannelSession(db, tenantId, session.id)).draft_payload;
-  const consolidated = parseConsolidatedChannelMessages(messageText, {
-    currentDraft,
-    repeatOfferPending: currentDraft.conversation_flags?.repeat_offer_pending === true,
-  });
 
   const finish = async (result: Omit<ProcessChannelInboundResult, "session_id">) => {
     await logExchange(db, tenantId, contact.id, session!.id, input, result.reply_text);
@@ -178,6 +254,30 @@ export async function processChannelInbound(
       },
     });
   };
+
+  let consolidated = parseConsolidatedChannelMessages(messageText, {
+    currentDraft,
+    repeatOfferPending: currentDraft.conversation_flags?.repeat_offer_pending === true,
+  });
+
+  const llmAttempt = await tryLlmExtractionFallback(
+    db,
+    tenantId,
+    session.id,
+    input,
+    messageText,
+    currentDraft,
+    consolidated,
+  );
+  consolidated = llmAttempt.consolidated;
+
+  if (llmAttempt.pendingReview) {
+    return finish({
+      status: "pending_review",
+      reply_text: buildPendingReviewReply(displayName ?? undefined),
+      emitted: false,
+    });
+  }
 
   if (consolidated.hasHelp) {
     return finish({ status: session.status, reply_text: buildChannelHelpReply(), emitted: false });
@@ -225,6 +325,10 @@ export async function processChannelInbound(
     });
     if (!consolidated.hasConfirm) {
       const current = await getChannelSession(db, tenantId, session.id);
+      const ambiguity = serviceAmbiguityReply(current.draft_payload);
+      if (ambiguity) {
+        return finish({ status: current.status, reply_text: ambiguity, emitted: false });
+      }
       if (hasEmissionIntent && !missingListAlreadySent(current.draft_payload)) {
         return finish({
           status: current.status,

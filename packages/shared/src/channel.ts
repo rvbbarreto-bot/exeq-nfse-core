@@ -7,6 +7,9 @@ export const channelSessionStatusSchema = z.enum([
   "emitted",
   "expired",
   "cancelled",
+  "emitting",
+  "error",
+  "pending_review",
 ]);
 
 export type ChannelSessionStatus = z.infer<typeof channelSessionStatusSchema>;
@@ -35,6 +38,10 @@ export const channelDraftSchema = z.object({
   service_code: z.string().min(1).max(32).optional(),
   tomador_email: z.string().max(255).optional(),
   tomador_address: channelTomadorAddressSchema.optional(),
+  /** Termo bruto de cidade (LLM/parser) — resolvido para ibge_code no Core. */
+  city_hint: z.string().max(120).optional(),
+  /** Descrição livre do serviço (LLM) — resolvido para service_id no Core. */
+  service_hint: z.string().max(255).optional(),
   conversation_flags: z
     .object({
       repeat_offer_pending: z.boolean().optional(),
@@ -42,6 +49,10 @@ export const channelDraftSchema = z.object({
       greeted: z.boolean().optional(),
       /** Lista V11A de campos faltantes já enviada — evita repetir a cada cumprimento/intenção. */
       missing_list_sent: z.boolean().optional(),
+      /** Serviços ambíguos detectados pelo hint LLM. */
+      service_ambiguous_options: z
+        .array(z.object({ service_code: z.string(), description: z.string() }))
+        .optional(),
     })
     .optional(),
 });

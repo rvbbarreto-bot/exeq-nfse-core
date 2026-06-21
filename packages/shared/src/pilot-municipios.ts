@@ -70,7 +70,7 @@ const MUNICIPIO_ALIASES: Record<string, string> = {
   barueri: "3505708",
 };
 
-/** Resolve IBGE a partir do nome da cidade no texto (piloto SP). */
+/** Resolve IBGE a partir do nome da cidade no texto (piloto SP). Preferir resolveMunicipioIbgeFromDb na API. */
 export function resolveMunicipioIbgeFromText(text: string): string | undefined {
   const norm = normalizeCityToken(text);
   if (!norm) return undefined;

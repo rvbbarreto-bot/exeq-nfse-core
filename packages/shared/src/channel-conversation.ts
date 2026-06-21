@@ -268,4 +268,28 @@ export function buildContinuesListeningReply(displayName: string | undefined): s
   );
 }
 
+/** Sessão em revisão humana — confiança LLM baixa ou ambiguidade. */
+export function buildPendingReviewReply(displayName: string | undefined): string {
+  const nome = firstName(displayName);
+  const prefix = nome ? `${nome}, ` : "";
+  return (
+    `${prefix}recebi sua mensagem, mas alguns dados ficaram ambíguos.\n\n` +
+    `Nossa equipe vai revisar e retornar em breve. Se preferir, envie os dados um por vez (valor, documento, cidade…).`
+  );
+}
+
+/** Múltiplos serviços candidatos a partir do hint LLM. */
+export function buildServiceAmbiguityReply(
+  matches: Array<{ service_code: string; description: string }>,
+): string {
+  const lines = matches
+    .slice(0, 3)
+    .map((m) => `* ${m.service_code} — ${m.description}`)
+    .join("\n");
+  return (
+    `Encontrei mais de um serviço parecido:\n\n${lines}\n\n` +
+    `Responda com o código do serviço (ex.: 1.01) ou descreva com mais detalhe.`
+  );
+}
+
 export { CHANNEL_V11A_REQUIRED };

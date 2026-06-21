@@ -8,6 +8,8 @@ import {
 } from "@exeq/shared";
 import type { Sql } from "../../db/client.js";
 import { createCustomer, DuplicateDocumentError, getCustomer } from "../master-data/master-data.service.js";
+import { resolveMunicipioIbgeFromDb } from "./ibge-lookup.service.js";
+import { resolveServiceFromHint } from "./service-catalog-search.service.js";
 
 export async function findCustomerIdByDocument(
   db: Sql,
@@ -97,6 +99,27 @@ export async function resolveChannelDraftIds(
   if (!next.service_id && next.service_code) {
     const serviceId = await findServiceIdByCode(db, tenantId, next.service_code);
     if (serviceId) next.service_id = serviceId;
+  }
+
+  if (!next.ibge_code && next.city_hint) {
+    const ibge = await resolveMunicipioIbgeFromDb(db, next.city_hint);
+    if (ibge) next.ibge_code = ibge;
+  }
+
+  if (!next.service_id && next.service_hint) {
+    const resolved = await resolveServiceFromHint(db, tenantId, next.service_hint);
+    if (resolved.service_id) {
+      next.service_id = resolved.service_id;
+      if (resolved.service_code) next.service_code = resolved.service_code;
+    } else if (resolved.ambiguous_matches?.length) {
+      next.conversation_flags = {
+        ...next.conversation_flags,
+        service_ambiguous_options: resolved.ambiguous_matches.map((m) => ({
+          service_code: m.service_code,
+          description: m.description,
+        })),
+      };
+    }
   }
 
   return next;

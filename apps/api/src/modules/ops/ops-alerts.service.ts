@@ -6,6 +6,7 @@ export type OpsAlerts = {
   webhooks_failed: number;
   charges_pending: number;
   charges_registered: number;
+  channel_pending_review: number;
 };
 
 export async function getOpsAlerts(db: Sql, tenantId: string): Promise<OpsAlerts> {
@@ -47,10 +48,19 @@ export async function getOpsAlerts(db: Sql, tenantId: string): Promise<OpsAlerts
       AND status = 'registered'::exeq_core.charge_status
   `;
 
+  const [channelReviewRow] = await db<{ count: string }[]>`
+    SELECT count(*)::text AS count
+    FROM exeq_core.channel_session
+    WHERE tenant_id = ${tenantId}::uuid
+      AND status = 'pending_review'::exeq_core.channel_session_status
+  `;
+
   return {
     issues_failed: Number(issuesFailedRow?.count ?? 0),
     issues_queued: Number(issuesQueuedRow?.count ?? 0),
     webhooks_failed: Number(webhooksRow?.count ?? 0),
     charges_pending: Number(chargesPendingRow?.count ?? 0),
     charges_registered: Number(chargesRegisteredRow?.count ?? 0),
-  };}
+    channel_pending_review: Number(channelReviewRow?.count ?? 0),
+  };
+}

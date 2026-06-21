@@ -65,7 +65,8 @@ export async function findActiveChannelSessionByPhone(
       AND phone_e164 = ${phoneE164}
       AND status IN (
         'collecting'::exeq_core.channel_session_status,
-        'ready_to_confirm'::exeq_core.channel_session_status
+        'ready_to_confirm'::exeq_core.channel_session_status,
+        'pending_review'::exeq_core.channel_session_status
       )
     ORDER BY updated_at DESC
     LIMIT 1
@@ -127,9 +128,12 @@ export async function collectChannelSessionDraft(
   }
 
   const merged = { ...current.draft_payload, ...patch };
-  const nextStatus: ChannelSessionStatus = isDraftReady(merged)
-    ? "ready_to_confirm"
-    : "collecting";
+  let nextStatus: ChannelSessionStatus;
+  if (current.status === "pending_review") {
+    nextStatus = isDraftReady(merged) ? "ready_to_confirm" : "collecting";
+  } else {
+    nextStatus = isDraftReady(merged) ? "ready_to_confirm" : "collecting";
+  }
 
   const [row] = await db<SessionRow[]>`
     UPDATE exeq_core.channel_session SET
@@ -157,6 +161,45 @@ export async function markChannelSessionEmitted(
     UPDATE exeq_core.channel_session SET
       status = 'emitted'::exeq_core.channel_session_status,
       nf_issue_id = ${issueId}::uuid,
+      updated_at = now()
+    WHERE tenant_id = ${tenantId}::uuid AND id = ${sessionId}::uuid
+  `;
+}
+
+export async function setChannelSessionPendingReview(
+  db: Sql,
+  tenantId: string,
+  sessionId: string,
+): Promise<void> {
+  await db`
+    UPDATE exeq_core.channel_session SET
+      status = 'pending_review'::exeq_core.channel_session_status,
+      updated_at = now()
+    WHERE tenant_id = ${tenantId}::uuid AND id = ${sessionId}::uuid
+  `;
+}
+
+export async function markChannelSessionError(
+  db: Sql,
+  tenantId: string,
+  sessionId: string,
+): Promise<void> {
+  await db`
+    UPDATE exeq_core.channel_session SET
+      status = 'error'::exeq_core.channel_session_status,
+      updated_at = now()
+    WHERE tenant_id = ${tenantId}::uuid AND id = ${sessionId}::uuid
+  `;
+}
+
+export async function markChannelSessionEmitting(
+  db: Sql,
+  tenantId: string,
+  sessionId: string,
+): Promise<void> {
+  await db`
+    UPDATE exeq_core.channel_session SET
+      status = 'emitting'::exeq_core.channel_session_status,
       updated_at = now()
     WHERE tenant_id = ${tenantId}::uuid AND id = ${sessionId}::uuid
   `;

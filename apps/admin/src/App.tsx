@@ -8,6 +8,8 @@ import { CatalogsPage } from "./pages/CatalogsPage.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
 import { ChargeDetailPage } from "./pages/ChargeDetailPage.js";
 import { ChargesPage } from "./pages/ChargesPage.js";
+import { DasGuiaDetailPage } from "./pages/DasGuiaDetailPage.js";
+import { DasGuiasPage } from "./pages/DasGuiasPage.js";
 import { IssueDetailPage } from "./pages/IssueDetailPage.js";
 import { IssuesPage } from "./pages/IssuesPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
@@ -112,6 +114,22 @@ export function App() {
             element={
               <PrivateRoute>
                 <MasterDataPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/das/guias"
+            element={
+              <PrivateRoute>
+                <DasGuiasPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/das/guias/:id"
+            element={
+              <PrivateRoute>
+                <DasGuiaDetailPage />
               </PrivateRoute>
             }
           />

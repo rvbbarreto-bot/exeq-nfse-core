@@ -1,0 +1,15 @@
+{
+  "name": "@exeq/ui-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Design tokens EXEQ — paleta unificada do portal de cobrança (Inter, navy, cyan)",
+  "exports": {
+    ".": "./src/index.css",
+    "./brand": "./src/exeq-brand.css",
+    "./theme": "./src/theme-semantics.css"
+  },
+  "files": [
+    "src"
+  ]
+}

@@ -1,0 +1,34 @@
+/* EXEQ brand tokens — navy #0D1B2A + cyan #00C4E8 unificados (portal cobrança) */
+
+:root {
+  --exeq-navy-950: #0d1b2a;
+  --exeq-navy-900: #112240;
+  --exeq-navy-800: #1a3352;
+  --exeq-sidebar: #0d1b2a;
+
+  --exeq-cyan: #00c4e8;
+  --exeq-cyan-bright: #2dd4f5;
+  --exeq-cyan-muted: rgba(0, 196, 232, 0.55);
+  --exeq-cyan-soft: rgba(0, 196, 232, 0.12);
+
+  --exeq-success: #16a34a;
+  --exeq-warning: #ea580c;
+  --exeq-danger: #dc2626;
+  --exeq-info: #2563eb;
+
+  --exeq-radius-lg: 14px;
+  --exeq-radius-md: 10px;
+  --exeq-radius-sm: 8px;
+
+  --exeq-shadow-card: 0 1px 3px rgba(13, 27, 42, 0.06), 0 8px 28px rgba(13, 27, 42, 0.06);
+  --exeq-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Módulo fiscal / DAS */
+  --fiscal-accent: var(--exeq-cyan);
+  --fiscal-accent-soft: var(--exeq-cyan-soft);
+  --fiscal-card-border: var(--exeq-border, #e2e8f0);
+  --fiscal-card-shadow: var(--exeq-shadow-card);
+  --fiscal-kpi-radius: var(--exeq-radius-md);
+  --fiscal-danger-soft: rgba(220, 38, 38, 0.08);
+  --fiscal-warning-soft: rgba(234, 88, 12, 0.1);
+}

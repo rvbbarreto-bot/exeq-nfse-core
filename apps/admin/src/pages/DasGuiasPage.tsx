@@ -6,6 +6,7 @@ import { api, ApiError } from "../api/client.js";
 import { AppShell } from "../components/AppShell.js";
 import { PortalPage } from "../components/PortalPage.js";
 import { PortalPageHeader } from "../components/PortalPageHeader.js";
+import { ResponsiveTable } from "../components/ResponsiveTable.js";
 import { getToken } from "../lib/auth.js";
 import {
   buildDasGuiasQuery,
@@ -258,6 +259,7 @@ export function DasGuiasPage() {
         {guiasQuery.error && <p className="error">Falha ao carregar guias.</p>}
 
         <section className="dash-panel">
+        <ResponsiveTable caption="Guias DAS e DARF" label="Tabela de guias fiscais">
           <table className="table">
             <thead>
               <tr>
@@ -294,6 +296,7 @@ export function DasGuiasPage() {
               )}
             </tbody>
           </table>
+        </ResponsiveTable>
           {guiasQuery.hasNextPage ? (
             <button type="button" disabled={guiasQuery.isFetchingNextPage} onClick={() => void guiasQuery.fetchNextPage()}>
               {guiasQuery.isFetchingNextPage ? "Carregando…" : "Carregar mais"}

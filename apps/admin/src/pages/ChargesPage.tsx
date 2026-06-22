@@ -5,6 +5,7 @@ import { api } from "../api/client.js";
 import { AppShell } from "../components/AppShell.js";
 import { PortalPage } from "../components/PortalPage.js";
 import { PortalPageHeader } from "../components/PortalPageHeader.js";
+import { ResponsiveTable } from "../components/ResponsiveTable.js";
 import { getToken } from "../lib/auth.js";
 import {
   buildChargesQuery,
@@ -121,6 +122,7 @@ export function ChargesPage() {
         {chargesQuery.isLoading && <p>Carregando cobranças...</p>}
         {chargesQuery.error && <p className="error">Erro ao listar cobranças</p>}
 
+        <ResponsiveTable caption="Cobrancas" label="Tabela de cobrancas">
         <table className="table">
           <thead>
             <tr>
@@ -167,6 +169,7 @@ export function ChargesPage() {
             ))}
           </tbody>
         </table>
+        </ResponsiveTable>
 
         {!chargesQuery.isLoading && items.length === 0 && (
           <p className="muted">Nenhuma cobrança encontrada.</p>

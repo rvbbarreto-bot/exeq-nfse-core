@@ -5,6 +5,7 @@ import { api } from "../api/client.js";
 import { AppShell } from "../components/AppShell.js";
 import { PortalPage } from "../components/PortalPage.js";
 import { PortalPageHeader } from "../components/PortalPageHeader.js";
+import { ResponsiveTable } from "../components/ResponsiveTable.js";
 import {
   buildIssuesQuery,
   FILTER_STATUS_OPTIONS,
@@ -171,6 +172,7 @@ export function IssuesPage() {
         {issuesQuery.isLoading && <p>Carregando emissoes...</p>}
         {issuesQuery.error && <p className="error">Erro ao listar emissoes</p>}
 
+        <ResponsiveTable caption="Emissoes NFS-e" label="Tabela de emissoes">
         <table className="table">
           <thead>
             <tr>
@@ -203,6 +205,7 @@ export function IssuesPage() {
             ))}
           </tbody>
         </table>
+        </ResponsiveTable>
 
         {!issuesQuery.isLoading && items.length === 0 && (
           <p className="muted">Nenhuma emissao encontrada com os filtros atuais.</p>

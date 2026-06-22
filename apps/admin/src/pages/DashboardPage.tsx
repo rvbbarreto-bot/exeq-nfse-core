@@ -4,6 +4,7 @@ import { api } from "../api/client.js";
 import { AppShell } from "../components/AppShell.js";
 import { PortalPage } from "../components/PortalPage.js";
 import { PortalPageHeader } from "../components/PortalPageHeader.js";
+import { ResponsiveTable } from "../components/ResponsiveTable.js";
 import { buildChargeDashboardKpis } from "../lib/charge-dashboard.js";
 import { buildDashboardKpis, topStatusBreakdown } from "../lib/dashboard.js";
 import {
@@ -180,6 +181,7 @@ export function DashboardPage() {
             <section className="dash-panel">
               <h2 className="dash-panel__title">Emissoes recentes</h2>
               {recentQuery.isLoading && <p className="muted">Carregando…</p>}
+              <ResponsiveTable caption="Emissoes recentes" label="Tabela de emissoes recentes">
               <table className="table">
                 <thead>
                   <tr>
@@ -208,6 +210,7 @@ export function DashboardPage() {
                   ))}
                 </tbody>
               </table>
+              </ResponsiveTable>
               <Link to="/issues" className="fiscal-dash__all-link">
                 Ver todas as emissoes
               </Link>

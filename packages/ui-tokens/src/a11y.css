@@ -1,0 +1,167 @@
+/* EXEQ a11y + responsividade — Fase 6 */
+
+.app-shell--nav-open {
+  overflow: hidden;
+}
+
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 100;
+  padding: 0.55rem 0.9rem;
+  border-radius: var(--exeq-radius-sm);
+  background: var(--exeq-cyan);
+  color: var(--exeq-navy-950);
+  font-weight: 700;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 0.15s ease;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: none;
+  box-shadow: var(--exeq-focus-ring);
+}
+
+:where(a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--exeq-cyan);
+  outline-offset: 2px;
+}
+
+.sidebar__link:focus-visible,
+.sidebar-accordion__trigger:focus-visible,
+.shell-nav-toggle:focus-visible,
+.shell-header__logout:focus-visible,
+.btn-login-cta:focus-visible,
+.btn-portal-primary:focus-visible {
+  outline: 2px solid var(--exeq-cyan);
+  outline-offset: 2px;
+}
+
+.sidebar__link--active {
+  font-weight: 600;
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll .table {
+  min-width: 36rem;
+}
+
+.table-scroll:focus-within {
+  outline: 2px solid var(--exeq-cyan);
+  outline-offset: 2px;
+  border-radius: var(--exeq-radius-sm);
+}
+
+@media (max-width: 900px) {
+  .shell-header__meta {
+    display: none;
+  }
+
+  .shell-header__title {
+    font-size: 0.95rem;
+  }
+
+  .portal-page {
+    padding: 0;
+  }
+
+  .shell-page,
+  .fiscal-dash.fiscal-surface {
+    padding: 1rem;
+    border-radius: var(--exeq-radius-md);
+  }
+
+  .filters .filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-actions button,
+  .filter-actions .btn-portal-primary {
+    width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .shell-content {
+    padding: 0.85rem;
+  }
+
+  .detail-list div {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+
+  .detail-list dt {
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  .shell-page__head-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .shell-page__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .dash-kpi__value {
+    font-size: 1.35rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .skip-link {
+    transition: none;
+  }
+
+  .sidebar {
+    transition: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .sidebar__link--active {
+    border-width: 2px;
+  }
+
+  .pill {
+    border: 1px solid currentColor;
+  }
+}

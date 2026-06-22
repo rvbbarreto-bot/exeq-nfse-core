@@ -8,7 +8,8 @@
     ".": "./src/index.css",
     "./brand": "./src/exeq-brand.css",
     "./theme": "./src/theme-semantics.css",
-    "./portal-layout": "./src/portal-layout.css"
+    "./portal-layout": "./src/portal-layout.css",
+    "./a11y": "./src/a11y.css"
   },
   "files": [
     "src"

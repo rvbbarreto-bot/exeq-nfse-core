@@ -10,7 +10,9 @@ import {
   writeOpenNavGroups,
   type AdminNavGroup,
 } from "../lib/admin-nav.js";
+import { APP_SIDEBAR_ID, MAIN_CONTENT_ID, navAriaCurrent } from "../lib/a11y-nav.js";
 import { clearToken, getUserRoles, isAccountantOnly } from "../lib/auth.js";
+import { SkipLink } from "./SkipLink.js";
 
 function SidebarNavGroups({
   groups,
@@ -55,6 +57,7 @@ function SidebarNavGroups({
                       to={item.to}
                       data-testid={navTestId(item.to)}
                       className={`sidebar__link${active ? " sidebar__link--active" : ""}`}
+                      aria-current={navAriaCurrent(active)}
                     >
                       {item.label}
                     </Link>
@@ -129,6 +132,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={`app-shell${navOpen ? " app-shell--nav-open" : ""}`}>
+      <SkipLink />
       {navOpen ? (
         <button
           type="button"
@@ -137,7 +141,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onClick={() => setNavOpen(false)}
         />
       ) : null}
-      <aside className={`sidebar${navOpen ? " sidebar--open" : ""}`}>
+      <aside
+        id={APP_SIDEBAR_ID}
+        className={`sidebar${navOpen ? " sidebar--open" : ""}`}
+        aria-label="Navegacao lateral"
+      >
         <div className="sidebar__brand">
           <Link to="/" className="sidebar__logo">
             EXEQ
@@ -159,21 +167,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             className="shell-nav-toggle"
+            data-testid="shell-nav-toggle"
             aria-expanded={navOpen}
-            aria-label={navOpen ? "Fechar menu" : "Abrir menu"}
+            aria-controls={APP_SIDEBAR_ID}
+            aria-label={navOpen ? "Fechar menu de navegacao" : "Abrir menu de navegacao"}
             onClick={() => setNavOpen((open) => !open)}
           >
             Menu
           </button>
           <div className="shell-header__brand">
-            <h1 className="shell-header__title">Portal EXEQ</h1>
+            <p className="shell-header__title">Portal EXEQ</p>
             <span className="shell-header__meta">multi-tenant · emissao NFS-e · cobranca</span>
           </div>
-          <button type="button" className="shell-header__logout" onClick={logout}>
+          <button type="button" className="shell-header__logout" onClick={logout} aria-label="Sair da sessao">
             Sair
           </button>
         </header>
-        <div className="shell-content">{children}</div>
+        <div id={MAIN_CONTENT_ID} className="shell-content" tabIndex={-1}>
+          {children}
+        </div>
       </div>
     </div>
   );

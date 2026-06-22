@@ -26,7 +26,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="login-layout">
+    <main className="login-layout">
       <div className="login-brand">
         <h1 className="login-brand__logo">EXEQ</h1>
         <p className="login-brand__tag">NFS-e &amp; Cobranca</p>
@@ -79,6 +79,6 @@ export function LoginPage() {
           <div className="login-footer">Autenticacao JWT · RLS · auditoria de emissao</div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

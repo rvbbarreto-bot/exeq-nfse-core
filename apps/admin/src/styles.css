@@ -1,7 +1,7 @@
 :root {
-  font-family: "Segoe UI", system-ui, sans-serif;
-  color: #1a1a1a;
-  background: #f4f6f8;
+  font-family: var(--exeq-font);
+  color: var(--color-text-primary);
+  background: var(--exeq-surface);
 }
 
 * {
@@ -13,7 +13,7 @@ body {
 }
 
 a {
-  color: #0b5cab;
+  color: var(--color-primary);
   text-decoration: none;
 }
 
@@ -33,7 +33,7 @@ a {
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 1.5rem;
-  background: #0b5cab;
+  background: var(--exeq-sidebar);
   color: #fff;
   flex-wrap: wrap;
 }
@@ -51,9 +51,9 @@ a {
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #dde3ea;
-  border-radius: 8px;
+  background: var(--exeq-card);
+  border: 1px solid var(--exeq-border);
+  border-radius: var(--exeq-radius-sm);
   padding: 1rem 1.25rem;
   margin-bottom: 1rem;
 }
@@ -87,12 +87,13 @@ input[type="text"] {
 }
 
 button {
-  background: #0b5cab;
-  color: #fff;
+  background: var(--exeq-cyan);
+  color: var(--exeq-navy-950);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--exeq-radius-sm);
   padding: 0.55rem 1rem;
   cursor: pointer;
+  font-weight: 600;
 }
 
 button:disabled {
@@ -329,7 +330,7 @@ textarea {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #0b5cab;
+  background: var(--exeq-cyan);
   position: absolute;
   left: -6px;
   top: 0.35rem;
@@ -361,9 +362,9 @@ textarea {
 }
 
 .tabs button.active {
-  background: #0b5cab;
-  color: #fff;
-  border-color: #0b5cab;
+  background: var(--exeq-cyan);
+  color: var(--exeq-navy-950);
+  border-color: var(--exeq-cyan);
 }
 
 .ok-banner {

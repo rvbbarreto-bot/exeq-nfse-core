@@ -1,6 +1,8 @@
 import type { ChannelDraft } from "@exeq/shared";
 import {
+  applyTomadorCityToAddress,
   looksLikeFiscalServiceCode,
+  mergeChannelDraftPatch,
   normalizeIbge,
   normalizeServiceCode,
   onlyDigits,
@@ -59,6 +61,63 @@ function promoteInvalidServiceCodeToHint(next: ChannelDraft): void {
   delete next.service_code;
 }
 
+function mergeTomadorAddressPreferInbound(
+  inbound: ChannelDraft["tomador_address"] | undefined,
+  fromCustomer:
+    | {
+        street?: string;
+        number?: string;
+        complement?: string;
+        district?: string;
+        zip_code?: string;
+        ibge_code?: string;
+        uf?: string;
+      }
+    | undefined,
+): ChannelDraft["tomador_address"] | undefined {
+  const merged = { ...(inbound ?? {}) };
+
+  const fill = <K extends keyof NonNullable<ChannelDraft["tomador_address"]>>(
+    key: K,
+    value: NonNullable<ChannelDraft["tomador_address"]>[K] | undefined,
+  ) => {
+    const current = merged[key];
+    if (typeof current === "string" && current.trim()) return;
+    if (value === undefined || value === null) return;
+    if (typeof value === "string" && !value.trim()) return;
+    merged[key] = value;
+  };
+
+  if (fromCustomer) {
+    fill("street", fromCustomer.street);
+    fill("number", fromCustomer.number);
+    fill("complement", fromCustomer.complement);
+    fill("district", fromCustomer.district);
+    fill("zip_code", fromCustomer.zip_code?.replace(/\D/g, ""));
+    fill("ibge_code", fromCustomer.ibge_code);
+    fill("state", fromCustomer.uf?.toUpperCase());
+  }
+
+  return Object.values(merged).some((v) => typeof v === "string" && v.trim()) ? merged : undefined;
+}
+
+async function resolveTomadorCityIbge(
+  db: Sql,
+  draft: ChannelDraft,
+): Promise<ChannelDraft["tomador_address"] | undefined> {
+  const addr = draft.tomador_address;
+  if (!addr) return undefined;
+  if (normalizeIbge(addr.ibge_code)) return addr;
+
+  const cityHint = addr.city_name?.trim();
+  if (!cityHint) return addr;
+
+  const ibge = await resolveMunicipioIbgeFromDb(db, cityHint);
+  if (!ibge) return addr;
+
+  return { ...addr, ibge_code: ibge, city_name: undefined };
+}
+
 /** Resolve tomador/serviço a partir dos campos V11A no draft (lookup ou create tomador). */
 export async function resolveChannelDraftIds(
   db: Sql,
@@ -106,16 +165,8 @@ export async function resolveChannelDraftIds(
     if (customerId) {
       next.customer_id = customerId;
       const customer = await getCustomer(db, tenantId, customerId);
-      if (customer.address && !hasTomadorAddressFields(next.tomador_address ?? {})) {
-        next.tomador_address = {
-          street: customer.address.street,
-          number: customer.address.number,
-          complement: customer.address.complement,
-          district: customer.address.district,
-          zip_code: customer.address.zip_code,
-          ibge_code: customer.address.ibge_code,
-          state: customer.address.uf,
-        };
+      if (customer.address) {
+        next.tomador_address = mergeTomadorAddressPreferInbound(next.tomador_address, customer.address);
       }
       if (next.tomador_address && hasTomadorAddressFields(next.tomador_address)) {
         await updateCustomer(db, tenantId, customerId, {
@@ -149,6 +200,10 @@ export async function resolveChannelDraftIds(
   if (!next.ibge_code && next.city_hint) {
     const ibge = await resolveMunicipioIbgeFromDb(db, next.city_hint);
     if (ibge) next.ibge_code = ibge;
+  }
+
+  if (next.tomador_address) {
+    next.tomador_address = (await resolveTomadorCityIbge(db, next)) ?? next.tomador_address;
   }
 
   if (!next.service_id && next.service_hint) {
@@ -238,15 +293,15 @@ export function applyLabeledFieldsToDraft(
     labeled.tomador_state;
 
   if (hasAddress) {
-    next.tomador_address = {
-      street: labeled.tomador_street,
-      number: labeled.tomador_number,
-      complement: labeled.tomador_complement,
-      district: labeled.tomador_district,
-      zip_code: onlyDigits(labeled.tomador_zip),
-      ibge_code: normalizeIbge(labeled.tomador_city_ibge),
-      state: labeled.tomador_state?.toUpperCase(),
-    };
+    const addr: NonNullable<ChannelDraft["tomador_address"]> = {};
+    if (labeled.tomador_street) addr.street = labeled.tomador_street;
+    if (labeled.tomador_number) addr.number = labeled.tomador_number;
+    if (labeled.tomador_complement) addr.complement = labeled.tomador_complement;
+    if (labeled.tomador_district) addr.district = labeled.tomador_district;
+    if (labeled.tomador_zip) addr.zip_code = onlyDigits(labeled.tomador_zip);
+    if (labeled.tomador_state) addr.state = labeled.tomador_state.toUpperCase();
+    if (labeled.tomador_city_ibge) applyTomadorCityToAddress(addr, labeled.tomador_city_ibge);
+    next.tomador_address = mergeChannelDraftPatch(next, { tomador_address: addr }).tomador_address;
   }
 
   return next;

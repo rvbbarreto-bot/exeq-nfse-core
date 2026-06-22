@@ -3,6 +3,8 @@
  * Regras fiscais e emissão permanecem no Core API (ADR-007).
  */
 
+import { resolveMunicipioIbgeFromText } from "./pilot-municipios.js";
+
 export type ChannelLabeledFields = {
   tomador_name?: string;
   tomador_document?: string;
@@ -88,6 +90,10 @@ const LABEL_MAP: { field: keyof ChannelLabeledFields; labels: string[] }[] = [
       "codigo do municipio do tomador",
       "codigo ibge municipio tomador",
       "codigo ibge do municipio do tomador",
+      "cidade do tomador",
+      "cidade tomador",
+      "municipio do tomador",
+      "município do tomador",
     ],
   },
   { field: "tomador_state", labels: ["uf do tomador"] },
@@ -270,6 +276,39 @@ export function normalizeIbge(code: string | undefined): string | undefined {
   return digits.length === 7 ? digits : undefined;
 }
 
+/** Cidade do tomador informada (IBGE ou nome — nunca exigir código técnico ao cliente). */
+export function isTomadorCityProvided(value: string | undefined): boolean {
+  if (normalizeIbge(value)) return true;
+  const text = String(value ?? "").trim();
+  if (text.length < 3) return false;
+  return onlyDigits(text).length !== 7;
+}
+
+export function applyTomadorCityToAddress(
+  address: { ibge_code?: string; city_name?: string },
+  raw?: string,
+): void {
+  const text = String(raw ?? "").trim();
+  if (!text) return;
+
+  const ibge = normalizeIbge(text);
+  if (ibge) {
+    address.ibge_code = ibge;
+    delete address.city_name;
+    return;
+  }
+
+  const fromPilot = resolveMunicipioIbgeFromText(text);
+  if (fromPilot) {
+    address.ibge_code = fromPilot;
+    delete address.city_name;
+    return;
+  }
+
+  address.city_name = text.slice(0, 120);
+  delete address.ibge_code;
+}
+
 export function getMissingV11aFields(fields: ChannelLabeledFields): (typeof CHANNEL_V11A_REQUIRED)[number][] {
   const missing: (typeof CHANNEL_V11A_REQUIRED)[number][] = [];
 
@@ -305,7 +344,7 @@ export function getMissingTomadorAddressFields(
       continue;
     }
     if (key === "tomador_city_ibge") {
-      if (!normalizeIbge(v)) missing.push(key);
+      if (!isTomadorCityProvided(v)) missing.push(key);
       continue;
     }
     if (!v || String(v).trim() === "") missing.push(key);
@@ -320,7 +359,7 @@ const MISSING_LABELS: Partial<Record<keyof ChannelLabeledFields, string>> = {
   tomador_number: "numero do tomador",
   tomador_district: "bairro do tomador",
   tomador_zip: "CEP do tomador",
-  tomador_city_ibge: "codigo IBGE do municipio do tomador",
+  tomador_city_ibge: "cidade do tomador (ex.: Atibaia)",
   amount_label: "valor do serviço",
   description: "descrição do serviço",
   competence_label: "data da prestação",

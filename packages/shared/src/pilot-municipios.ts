@@ -63,6 +63,7 @@ function normalizeCityToken(value: string): string {
 
 const MUNICIPIO_ALIASES: Record<string, string> = {
   atibaia: "3504107",
+  tibaya: "3504107",
   braganca: "3507605",
   "braganca paulista": "3507605",
   mairipora: "3528502",

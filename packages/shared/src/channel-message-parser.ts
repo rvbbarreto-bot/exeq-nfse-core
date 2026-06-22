@@ -1,6 +1,7 @@
 import type { ChannelDraft } from "./channel.js";
 import { isChannelDraftReadyForConfirm } from "./channel.js";
 import {
+  applyTomadorCityToAddress,
   buildV11aConfirmationReply,
   buildV11aMissingReply,
   extractLabeledChannelFields,
@@ -96,24 +97,18 @@ function buildPatchFromLabeled(labeled: ChannelLabeledFields): Partial<ChannelDr
     if (fromCity) patch.ibge_code = fromCity;
   }
   if (labeled.tomador_email) patch.tomador_email = labeled.tomador_email;
-  const addr =
-    labeled.tomador_street ||
-    labeled.tomador_number ||
-    labeled.tomador_complement ||
-    labeled.tomador_district ||
-    labeled.tomador_zip ||
-    labeled.tomador_city_ibge ||
-    labeled.tomador_state;
-  if (addr) {
-    patch.tomador_address = {
-      street: labeled.tomador_street,
-      number: labeled.tomador_number,
-      complement: labeled.tomador_complement,
-      district: labeled.tomador_district,
-      zip_code: labeled.tomador_zip?.replace(/\D/g, ""),
-      ibge_code: labeled.tomador_city_ibge?.replace(/\D/g, "").slice(0, 7),
-      state: labeled.tomador_state?.toUpperCase(),
-    };
+
+  const tomadorAddress: NonNullable<ChannelDraft["tomador_address"]> = {};
+  if (labeled.tomador_street) tomadorAddress.street = labeled.tomador_street;
+  if (labeled.tomador_number) tomadorAddress.number = labeled.tomador_number;
+  if (labeled.tomador_complement) tomadorAddress.complement = labeled.tomador_complement;
+  if (labeled.tomador_district) tomadorAddress.district = labeled.tomador_district;
+  if (labeled.tomador_zip) tomadorAddress.zip_code = labeled.tomador_zip.replace(/\D/g, "");
+  if (labeled.tomador_state) tomadorAddress.state = labeled.tomador_state.toUpperCase();
+  if (labeled.tomador_city_ibge) applyTomadorCityToAddress(tomadorAddress, labeled.tomador_city_ibge);
+
+  if (Object.keys(tomadorAddress).length > 0) {
+    patch.tomador_address = tomadorAddress;
   }
   return patch;
 }
@@ -232,7 +227,7 @@ export function buildChannelCollectReply(
       tomador_number: draft.tomador_address?.number,
       tomador_complement: draft.tomador_address?.complement,
       tomador_district: draft.tomador_address?.district,
-      tomador_city_ibge: draft.tomador_address?.ibge_code,
+      tomador_city_ibge: draft.tomador_address?.ibge_code ?? draft.tomador_address?.city_name,
       tomador_state: draft.tomador_address?.state,
       tomador_zip: draft.tomador_address?.zip_code,
     };
@@ -254,7 +249,7 @@ export function buildChannelCollectReply(
     tomador_number: draft.tomador_address?.number,
     tomador_complement: draft.tomador_address?.complement,
     tomador_district: draft.tomador_address?.district,
-    tomador_city_ibge: draft.tomador_address?.ibge_code,
+    tomador_city_ibge: draft.tomador_address?.ibge_code ?? draft.tomador_address?.city_name,
     tomador_state: draft.tomador_address?.state,
     tomador_zip: draft.tomador_address?.zip_code,
   };

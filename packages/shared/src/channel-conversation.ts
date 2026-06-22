@@ -1,6 +1,8 @@
 import type { ChannelDraft } from "./channel.js";
 import {
   CHANNEL_V11A_REQUIRED,
+  applyTomadorCityToAddress,
+  getMissingTomadorAddressFields,
   getMissingV11aFields,
   onlyDigits,
   parseAmountCentsFromLabel,
@@ -165,6 +167,64 @@ function extractDescriptionFreeform(text: string): string | undefined {
   return undefined;
 }
 
+function draftToTomadorAddressLabeled(draft: ChannelDraft): ChannelLabeledFields {
+  return {
+    tomador_street: draft.tomador_address?.street,
+    tomador_number: draft.tomador_address?.number,
+    tomador_district: draft.tomador_address?.district,
+    tomador_zip: draft.tomador_address?.zip_code,
+    tomador_city_ibge: draft.tomador_address?.ibge_code ?? draft.tomador_address?.city_name,
+  };
+}
+
+function patchTomadorAddressFromContext(
+  normalized: string,
+  draft: ChannelDraft,
+): Partial<ChannelDraft> {
+  const addressMissing = getMissingTomadorAddressFields(draftToTomadorAddressLabeled(draft));
+  if (addressMissing.length === 0) return {};
+
+  const addr = { ...(draft.tomador_address ?? {}) };
+  let touched = false;
+
+  if (addressMissing.includes("tomador_city_ibge")) {
+    const ibge = resolveMunicipioIbgeFromText(normalized);
+    if (ibge) {
+      addr.ibge_code = ibge;
+      delete addr.city_name;
+      touched = true;
+    } else if (normalized.length >= 3 && !parseAmountCentsFromFreeformText(normalized)) {
+      applyTomadorCityToAddress(addr, normalized);
+      touched = true;
+    }
+  }
+
+  if (addressMissing.includes("tomador_zip")) {
+    const zip = onlyDigits(normalized);
+    if (zip.length === 8) {
+      addr.zip_code = zip;
+      touched = true;
+    }
+  }
+
+  if (addressMissing.includes("tomador_number") && /^\d+[a-z0-9-]*$/i.test(normalized)) {
+    addr.number = normalized.slice(0, 32);
+    touched = true;
+  }
+
+  if (addressMissing.includes("tomador_street") && addressMissing.length === 1) {
+    addr.street = normalized.slice(0, 255);
+    touched = true;
+  }
+
+  if (addressMissing.includes("tomador_district") && addressMissing.length === 1) {
+    addr.district = normalized.slice(0, 120);
+    touched = true;
+  }
+
+  return touched ? { tomador_address: addr } : {};
+}
+
 /** Extrai campos faltantes a partir de mensagem livre (multi-turn). */
 export function patchFromContextualMessage(
   text: string,
@@ -175,6 +235,9 @@ export function patchFromContextualMessage(
 
   const missing = getMissingV11aFields(draftToLabeled(draft));
   if (missing.length === 0) {
+    const addressPatch = patchTomadorAddressFromContext(normalized, draft);
+    if (Object.keys(addressPatch).length > 0) return addressPatch;
+
     if (!draft.service_id) {
       const servicePrefix = parseServicePrefixText(normalized);
       if (servicePrefix && Object.keys(servicePrefix).length > 0) {
@@ -251,7 +314,41 @@ export function patchSingleMissingField(
   if (Object.keys(contextual).length > 0) return contextual;
 
   const missing = getMissingV11aFields(draftToLabeled(draft));
-  if (missing.length !== 1) return null;
+  if (missing.length !== 1) {
+    const addressMissing = getMissingTomadorAddressFields(draftToTomadorAddressLabeled(draft));
+    if (missing.length === 0 && addressMissing.length === 1) {
+      const value = normalizeText(text);
+      if (!value || value.includes(":")) return null;
+      if (GREETING_RE.test(value) || EMISSION_INTENT_RE.test(value)) return null;
+
+      const addr = { ...(draft.tomador_address ?? {}) };
+      switch (addressMissing[0]!) {
+        case "tomador_street":
+          addr.street = value.slice(0, 255);
+          break;
+        case "tomador_number":
+          if (!/^\d+[a-z0-9-]*$/i.test(value)) return null;
+          addr.number = value.slice(0, 32);
+          break;
+        case "tomador_district":
+          addr.district = value.slice(0, 120);
+          break;
+        case "tomador_zip": {
+          const zip = onlyDigits(value);
+          if (zip.length !== 8) return null;
+          addr.zip_code = zip;
+          break;
+        }
+        case "tomador_city_ibge":
+          applyTomadorCityToAddress(addr, value);
+          break;
+        default:
+          return null;
+      }
+      return { tomador_address: addr };
+    }
+    return null;
+  }
 
   const value = normalizeText(text);
   if (!value || value.includes(":")) return null;

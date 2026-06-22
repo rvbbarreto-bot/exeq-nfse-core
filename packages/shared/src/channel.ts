@@ -23,6 +23,8 @@ export const channelTomadorAddressSchema = z.object({
   district: z.string().optional(),
   zip_code: z.string().optional(),
   ibge_code: z.string().optional(),
+  /** Nome da cidade informado pelo cliente — resolvido para ibge_code no Core. */
+  city_name: z.string().max(120).optional(),
   state: z.string().optional(),
 });
 
@@ -125,7 +127,7 @@ function draftToV11aFields(draft: ChannelDraft): ChannelLabeledFields {
     tomador_number: draft.tomador_address?.number,
     tomador_district: draft.tomador_address?.district,
     tomador_zip: draft.tomador_address?.zip_code,
-    tomador_city_ibge: draft.tomador_address?.ibge_code,
+    tomador_city_ibge: draft.tomador_address?.ibge_code ?? draft.tomador_address?.city_name,
     amount_label:
       draft.amount_cents != null
         ? (draft.amount_cents / 100).toFixed(2).replace(".", ",")

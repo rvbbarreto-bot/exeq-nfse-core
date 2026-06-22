@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildV11aConfirmationReply,
   extractLabeledChannelFields,
+  getMissingTomadorAddressFields,
   getMissingV11aFields,
   parseAmountCentsFromLabel,
 } from "../src/channel-labeled-parser.js";
@@ -18,7 +19,8 @@ Logradouro do tomador: Rua Anapolis
 Número do tomador: 100
 Complemento do tomador: Complemento CONJ 05 PAVMTO7 EDIF N B C
 Bairro do tomador: VILA NILVA
-CEP do tomador: 06404250`;
+CEP do tomador: 06404250
+Código do município do tomador: 3505708`;
 
 describe("channel-labeled-parser V11A", () => {
   it("extrai bloco rotulado do PO", () => {
@@ -30,6 +32,7 @@ describe("channel-labeled-parser V11A", () => {
     expect(f.service_code).toBe("01.07.01");
     expect(f.tomador_email).toBe("riicardo84@hotmail.com");
     expect(getMissingV11aFields(f)).toHaveLength(0);
+    expect(getMissingTomadorAddressFields(f)).toHaveLength(0);
   });
 
   it("parse valor BR", () => {
@@ -44,5 +47,18 @@ describe("channel-labeled-parser V11A", () => {
     expect(msg).toContain("MARIA BEATRIZ");
     expect(msg).toContain("54.955.991/0001-95");
     expect(msg).toContain("CONFIRMAR");
+  });
+
+  it("aceita nome da cidade do tomador sem codigo IBGE", () => {
+    const f = extractLabeledChannelFields(
+      "Logradouro do tomador: Rua A\nNumero do tomador: 10\nBairro do tomador: Centro\nCEP do tomador: 12940000\nCidade do tomador: Atibaia",
+    );
+    expect(getMissingTomadorAddressFields(f)).toHaveLength(0);
+  });
+
+  it("nao exige IBGE quando cliente informa Atibaia", () => {
+    expect(getMissingTomadorAddressFields({ tomador_city_ibge: "Atibaia" })).not.toContain(
+      "tomador_city_ibge",
+    );
   });
 });

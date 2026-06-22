@@ -2,6 +2,7 @@ import type { ChannelDraft } from "./channel.js";
 import {
   CHANNEL_V11A_REQUIRED,
   applyTomadorCityToAddress,
+  extractTomadorCityFromPhrase,
   getMissingTomadorAddressFields,
   getMissingV11aFields,
   isTomadorCityPhrase,
@@ -270,8 +271,17 @@ export function patchFromContextualMessage(
   }
 
   if (missing.includes("ibge_code")) {
-    const ibge = resolveMunicipioIbgeFromText(normalized);
-    if (ibge) patch.ibge_code = ibge;
+    if (isTomadorCityPhrase(normalized)) {
+      const city = extractTomadorCityFromPhrase(normalized);
+      if (city) {
+        const addr = { ...(draft.tomador_address ?? {}) };
+        applyTomadorCityToAddress(addr, city);
+        patch.tomador_address = addr;
+      }
+    } else {
+      const ibge = resolveMunicipioIbgeFromText(normalized);
+      if (ibge) patch.ibge_code = ibge;
+    }
   }
 
   if (missing.includes("service_code")) {

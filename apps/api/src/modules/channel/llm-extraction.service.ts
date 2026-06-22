@@ -93,7 +93,73 @@ REGRAS:
 - cidade: nome bruto (ex: "Atibaia"), sem código IBGE.
 - data_competencia: YYYY-MM-DD quando possível.
 - service_code_hint: tipo de serviço em texto livre.
+- NUNCA preencha tomador_nome ou tomador_cnpj se o usuário não informou documento (CPF/CNPJ) ou nome do tomador na conversa.
+- NUNCA invente valor_servico, cidade, descricao_servico ou data_competencia — só extraia se o cliente mencionou explicitamente na conversa.
+- Se o cliente só cumprimenta, pergunta quais dados enviar ou expressa intenção vaga de emitir, retorne intent "help" e campos null.
 - Não invente dados não mencionados.`;
+}
+
+/** Tomador só entra no draft se o usuário mencionou documento ou rótulo tomador/cliente. */
+export function tomadorExplicitInText(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) return false;
+  if (/\b[\d./-]{14,22}\b/.test(normalized)) return true;
+  if (/\b(\d{11}|\d{14})\b/.test(normalized)) return true;
+  return /(?:tomador|cliente|documento|cpf|cnpj)\s*[:\-]/i.test(normalized);
+}
+
+export function filterLlmTomadorPatch(
+  patch: Partial<ChannelDraft>,
+  sourceText: string,
+): Partial<ChannelDraft> {
+  return filterLlmDraftPatch(patch, sourceText);
+}
+
+function amountExplicitInText(text: string): boolean {
+  return /\b(valor|r\$|\d+[,.]\d{2}|\d+\s*(reais|real))\b/i.test(text);
+}
+
+function cityExplicitInText(text: string): boolean {
+  const normalized = text.toLowerCase();
+  if (/\b(cidade|municipio|município|ibge)\b/i.test(normalized)) return true;
+  return /\b(atibaia|bragan[cç]a|mairi[póo]ra)\b/i.test(normalized);
+}
+
+function descriptionExplicitInText(text: string): boolean {
+  if (/^emitir\s+(uma\s+)?no?ts?\s*$/im.test(text.trim())) return false;
+  return /(?:descri[cç][aã]o|servi[cç]o|servico)\s*[:\-]/i.test(text);
+}
+
+/** Remove campos inferidos pelo LLM que não aparecem no texto do cliente. */
+export function filterLlmDraftPatch(
+  patch: Partial<ChannelDraft>,
+  sourceText: string,
+): Partial<ChannelDraft> {
+  const next = { ...patch };
+
+  if (!tomadorExplicitInText(sourceText)) {
+    delete next.tomador_name;
+    delete next.tomador_document;
+  }
+
+  if (next.amount_cents != null && !amountExplicitInText(sourceText)) {
+    delete next.amount_cents;
+  }
+
+  if ((next.ibge_code || next.city_hint) && !cityExplicitInText(sourceText)) {
+    delete next.ibge_code;
+    delete next.city_hint;
+  }
+
+  if (next.description && !descriptionExplicitInText(sourceText)) {
+    delete next.description;
+  }
+
+  if (next.service_hint && !descriptionExplicitInText(sourceText) && !/\bservi[cç]o\b/i.test(sourceText)) {
+    delete next.service_hint;
+  }
+
+  return next;
 }
 
 function parseLlmJson(raw: string): z.infer<typeof llmJsonSchema> {
@@ -300,6 +366,9 @@ export function shouldAttemptLlmFallback(
   },
 ): boolean {
   if (!env.CHANNEL_LLM_FALLBACK_ENABLED || !env.OPENAI_API_KEY) return false;
+  if (/\b(quais|que)\s+(os\s+)?dados|o\s+que\s+(preciso|devo)\s+(enviar|mandar)|me\s+(fala|diga)\b/i.test(messageText)) {
+    return false;
+  }
   if (mergedPatchKeys > 0) return false;
   if (messageText.trim().length <= 20) return false;
   if (flags.hasConfirm || flags.hasCancel || flags.hasHelp) return false;

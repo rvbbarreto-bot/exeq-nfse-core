@@ -32,6 +32,23 @@ const CANCEL_RE = /^(cancelar|cancela|desistir|nao|não)[\s.!]*$/i;
 
 const HELP_RE = /^(ajuda|help|\?|como emitir)$/i;
 
+/** Cliente pergunta quais dados enviar — não é confirmação nem dado fiscal. */
+const DATA_REQUEST_RE =
+  /\b(quais|que)\s+(os\s+)?dados|o\s+que\s+(preciso|devo)\s+(enviar|mandar|informar|passar)|me\s+(fala|diga|explica|informa)|como\s+(fa[cç]o|procedo|solicito)\b/i;
+
+export function isDataRequestMessage(text: string): boolean {
+  return DATA_REQUEST_RE.test(normalizeText(text));
+}
+
+/** Intenção vaga de emissão — não é descrição fiscal nem dado confirmável. */
+export function isVagueEmissionPhrase(text: string): boolean {
+  const normalized = normalizeText(text);
+  if (/^emitir\s+(uma\s+)?(no?ts?|nota)\s*$/i.test(normalized)) return true;
+  if (EMISSION_INTENT_RE.test(normalized)) return true;
+  if (/^(ol[aá],?\s+)?(quero|queria)\s*$/i.test(normalized)) return true;
+  return false;
+}
+
 const GREETING_RE =
   /^(oi+|ol[aá]|bom dia|boa tarde|boa noite|e a[ií]|tudo bem|td bem|tudo certo|como vai|opa|fala|salve)(?:[\s,!?.]+.*)?$/i;
 
@@ -126,6 +143,12 @@ export function parseServicePrefixText(text: string): Partial<ChannelDraft> | nu
 }
 
 function extractDescriptionFreeform(text: string): string | undefined {
+  if (isVagueEmissionPhrase(text)) return undefined;
+  if (isDataRequestMessage(text)) return undefined;
+
+  const normalized = normalizeText(text);
+  if (parseCompetenceIsoFromLabel(normalized)) return undefined;
+
   const servicePrefix = parseServicePrefixText(text);
   if (servicePrefix?.description) return servicePrefix.description;
 
@@ -135,7 +158,7 @@ function extractDescriptionFreeform(text: string): string | undefined {
   if (/\b(?:servi[cç]o|servico)\b/i.test(text)) return undefined;
 
   if (text.length >= 8 && !GREETING_RE.test(text) && !EMISSION_INTENT_RE.test(text)) {
-    if (!extractTomadorDocument(text) && !parseAmountCentsFromLabel(text)) {
+    if (!extractTomadorDocument(text) && !parseAmountCentsFromFreeformText(text)) {
       return text.slice(0, 2000);
     }
   }
@@ -255,6 +278,9 @@ export function patchSingleMissingField(
       break;
     }
     case "description":
+      if (isVagueEmissionPhrase(value) || isDataRequestMessage(value) || parseCompetenceIsoFromLabel(value)) {
+        return null;
+      }
       patch.description = value.slice(0, 2000);
       break;
     case "competence_label": {

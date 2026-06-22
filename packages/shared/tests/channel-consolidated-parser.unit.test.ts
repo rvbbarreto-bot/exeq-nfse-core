@@ -70,9 +70,44 @@ describe("M0.3 parseConsolidatedChannelMessages", () => {
     expect(r.socialOnly).toBe(false);
   });
 
-  it("recupera serviço em linha classificada como unknown", () => {
-    const text = ["bom dia", "o serviço é serviço desenvolvimento de software"].join("\n");
+  it("consolida endereço do tomador linha a linha sem sobrescrever", () => {
+    const text = [
+      "Logradouro do tomador: Rua Homolog",
+      "Numero do tomador: 100",
+      "Bairro do tomador: Centro",
+      "CEP do tomador: 12940000",
+      "Codigo IBGE municipio tomador: 3504107",
+    ].join("\n");
+
     const r = parseConsolidatedChannelMessages(text);
-    expect(r.mergedPatch.service_hint).toBe("desenvolvimento de software");
+    expect(r.mergedPatch.tomador_address).toEqual({
+      street: "Rua Homolog",
+      number: "100",
+      district: "Centro",
+      zip_code: "12940000",
+      ibge_code: "3504107",
+    });
+  });
+
+  it("marca pergunta sobre dados obrigatórios sem extrair descrição", () => {
+    const text = [
+      "Olá, quero",
+      "Emitir uma nots",
+      "Para amanhã",
+      "Quais os dados que preciso envias?",
+      "Me fala pf.",
+    ].join("\n");
+
+    const r = parseConsolidatedChannelMessages(text);
+    expect(r.hasHelp).toBe(false);
+    expect(r.mergedPatch.description).toBeUndefined();
+    expect(r.mergedPatch.competence_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("consolida valor coloquial mil reais com intenção de emissão", () => {
+    const text = ["quero emitir nota", "mil reais"].join("\n");
+    const r = parseConsolidatedChannelMessages(text);
+    expect(r.mergedPatch.amount_cents).toBe(100_000);
+    expect(r.mergedPatch.description).toBeUndefined();
   });
 });

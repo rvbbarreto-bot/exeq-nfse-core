@@ -8,7 +8,7 @@ import {
   parseCompetenceIsoFromLabel,
 } from "@exeq/shared";
 import type { Sql } from "../../db/client.js";
-import { createCustomer, DuplicateDocumentError, getCustomer } from "../master-data/master-data.service.js";
+import { createCustomer, DuplicateDocumentError, getCustomer, updateCustomer } from "../master-data/master-data.service.js";
 import { resolveMunicipioIbgeFromDb } from "./ibge-lookup.service.js";
 import { resolveServiceFromHint } from "./service-catalog-search.service.js";
 
@@ -69,6 +69,10 @@ export async function resolveChannelDraftIds(
 
   promoteInvalidServiceCodeToHint(next);
 
+  if (!next.tomador_document) {
+    delete next.customer_id;
+  }
+
   if (!next.customer_id && next.tomador_document && next.tomador_name) {
     const doc = onlyDigits(next.tomador_document);
     let customerId = await findCustomerIdByDocument(db, tenantId, doc);
@@ -101,6 +105,33 @@ export async function resolveChannelDraftIds(
 
     if (customerId) {
       next.customer_id = customerId;
+      const customer = await getCustomer(db, tenantId, customerId);
+      if (customer.address && !hasTomadorAddressFields(next.tomador_address ?? {})) {
+        next.tomador_address = {
+          street: customer.address.street,
+          number: customer.address.number,
+          complement: customer.address.complement,
+          district: customer.address.district,
+          zip_code: customer.address.zip_code,
+          ibge_code: customer.address.ibge_code,
+          state: customer.address.uf,
+        };
+      }
+      if (next.tomador_address && hasTomadorAddressFields(next.tomador_address)) {
+        await updateCustomer(db, tenantId, customerId, {
+          name: next.tomador_name,
+          email: next.tomador_email?.includes("@") ? next.tomador_email : undefined,
+          address: {
+            street: next.tomador_address.street,
+            number: next.tomador_address.number,
+            complement: next.tomador_address.complement,
+            district: next.tomador_address.district,
+            zip_code: next.tomador_address.zip_code?.replace(/\D/g, ""),
+            ibge_code: next.tomador_address.ibge_code,
+            uf: next.tomador_address.state,
+          },
+        });
+      }
       await getCustomer(db, tenantId, customerId);
     }
   }
@@ -143,6 +174,16 @@ export async function resolveChannelDraftIds(
   }
 
   return next;
+}
+
+function hasTomadorAddressFields(addr: NonNullable<ChannelDraft["tomador_address"]>): boolean {
+  return Boolean(
+    addr.street?.trim() &&
+      addr.number?.trim() &&
+      addr.district?.trim() &&
+      addr.zip_code?.replace(/\D/g, "").length === 8 &&
+      addr.ibge_code?.length === 7,
+  );
 }
 
 /** Aplica campos rotulados V11A ao draft canônico de emissão. */

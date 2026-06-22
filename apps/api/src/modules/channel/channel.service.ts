@@ -4,7 +4,7 @@ import type {
   ChannelSessionStatus,
   CreateChannelSessionRequest,
 } from "@exeq/shared";
-import { getMissingDraftFields, isDraftReady } from "@exeq/shared";
+import { getMissingDraftFields, isChannelDraftReadyForConfirm, mergeChannelDraftPatch } from "@exeq/shared";
 import type { Sql } from "../../db/client.js";
 import { isChannelPhoneAllowed } from "./channel-phone-guard.js";
 import { NotFoundError } from "../master-data/master-data.service.js";
@@ -127,12 +127,12 @@ export async function collectChannelSessionDraft(
     return current;
   }
 
-  const merged = { ...current.draft_payload, ...patch };
+  const merged = mergeChannelDraftPatch(current.draft_payload, patch);
   let nextStatus: ChannelSessionStatus;
   if (current.status === "pending_review") {
-    nextStatus = isDraftReady(merged) ? "ready_to_confirm" : "collecting";
+    nextStatus = isChannelDraftReadyForConfirm(merged) ? "ready_to_confirm" : "collecting";
   } else {
-    nextStatus = isDraftReady(merged) ? "ready_to_confirm" : "collecting";
+    nextStatus = isChannelDraftReadyForConfirm(merged) ? "ready_to_confirm" : "collecting";
   }
 
   const [row] = await db<SessionRow[]>`

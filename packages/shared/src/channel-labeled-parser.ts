@@ -32,6 +32,15 @@ export const CHANNEL_V11A_REQUIRED: readonly (keyof ChannelLabeledFields)[] = [
   "ibge_code",
 ] as const;
 
+/** Endereço do tomador — obrigatório na confirmação/emissão (CEP × IBGE — evita E0240). */
+export const CHANNEL_TOMADOR_ADDRESS_FIELDS = [
+  "tomador_street",
+  "tomador_number",
+  "tomador_district",
+  "tomador_zip",
+  "tomador_city_ibge",
+] as const satisfies readonly (keyof ChannelLabeledFields)[];
+
 const LABEL_MAP: { field: keyof ChannelLabeledFields; labels: string[] }[] = [
   { field: "tomador_name", labels: ["cliente", "nome do cliente", "tomador"] },
   { field: "tomador_document", labels: ["documento", "cpf/cnpj", "cpf cnpj", "cpf", "cnpj"] },
@@ -59,6 +68,8 @@ const LABEL_MAP: { field: keyof ChannelLabeledFields; labels: string[] }[] = [
     labels: [
       "código do município da prestação",
       "codigo do municipio da prestacao",
+      "cidade da prestação",
+      "cidade da prestacao",
       "codigo municipio",
       "municipio",
       "município",
@@ -72,7 +83,12 @@ const LABEL_MAP: { field: keyof ChannelLabeledFields; labels: string[] }[] = [
   { field: "tomador_district", labels: ["bairro do tomador"] },
   {
     field: "tomador_city_ibge",
-    labels: ["código do município do tomador", "codigo do municipio do tomador"],
+    labels: [
+      "código do município do tomador",
+      "codigo do municipio do tomador",
+      "codigo ibge municipio tomador",
+      "codigo ibge do municipio do tomador",
+    ],
   },
   { field: "tomador_state", labels: ["uf do tomador"] },
   { field: "tomador_zip", labels: ["cep do tomador"] },
@@ -159,7 +175,55 @@ export function parseAmountCentsFromFreeformText(text: string | undefined): numb
   }
 
   const withoutDoc = s.replace(/\b[\d./-]{14,22}\b/g, " ");
-  return parseAmountCentsFromLabel(withoutDoc);
+  const fromLabel = parseAmountCentsFromLabel(withoutDoc);
+  if (fromLabel != null && fromLabel > 0) return fromLabel;
+
+  return parseColloquialAmountReaisPt(s);
+}
+
+const PT_CARDINAL: Record<string, number> = {
+  um: 1,
+  uma: 1,
+  dois: 2,
+  duas: 2,
+  tres: 3,
+  três: 3,
+  quatro: 4,
+  cinco: 5,
+  seis: 6,
+  sete: 7,
+  oito: 8,
+  nove: 9,
+  dez: 10,
+};
+
+/** Valor coloquial PT-BR: "mil reais", "valor de mil", "2 mil". */
+export function parseColloquialAmountReaisPt(text: string | undefined): number | undefined {
+  const norm = String(text ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+  if (!norm) return undefined;
+
+  const numMil = norm.match(/(?:r\$\s*)?(\d+(?:[.,]\d+)?)\s*mil(?:\s+reais)?/);
+  if (numMil) {
+    const reais = Number(numMil[1]!.replace(",", ".")) * 1000;
+    if (Number.isFinite(reais) && reais > 0) return Math.round(reais * 100);
+  }
+
+  const wordMil = norm.match(/\b([a-z]+)\s+mil(?:\s+reais)?/);
+  if (wordMil) {
+    const word = wordMil[1]!;
+    const n = PT_CARDINAL[word] ?? Number(word);
+    if (Number.isFinite(n) && n > 0) return Math.round(n * 1000 * 100);
+  }
+
+  if (/\bmil\s+reais\b/.test(norm) || /\bvalor\s+(?:de\s+)?mil\b/.test(norm) || norm === "mil") {
+    return 100_000;
+  }
+
+  return undefined;
 }
 
 export function parseCompetenceIsoFromLabel(
@@ -177,15 +241,20 @@ export function parseCompetenceIsoFromLabel(
   const brInText = s.match(/\b(\d{2})\/(\d{2})\/(\d{4})\b/);
   if (brInText) return `${brInText[3]}-${brInText[2]}-${brInText[1]}`;
 
-  if (/\bontem\b/i.test(s)) {
-    const d = new Date(referenceDate);
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().slice(0, 10);
-  }
+  const norm = s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 
-  if (/\bhoje\b/i.test(s)) {
-    return referenceDate.toISOString().slice(0, 10);
-  }
+  const addDays = (days: number) => {
+    const d = new Date(referenceDate);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+
+  if (/\bontem\b/.test(norm)) return addDays(-1);
+  if (/\bhoje\b/.test(norm)) return referenceDate.toISOString().slice(0, 10);
+  if (/\bamanha\b/.test(norm)) return addDays(1);
 
   return undefined;
 }
@@ -225,9 +294,33 @@ export function getMissingV11aFields(fields: ChannelLabeledFields): (typeof CHAN
   return missing;
 }
 
+export function getMissingTomadorAddressFields(
+  fields: ChannelLabeledFields,
+): (typeof CHANNEL_TOMADOR_ADDRESS_FIELDS)[number][] {
+  const missing: (typeof CHANNEL_TOMADOR_ADDRESS_FIELDS)[number][] = [];
+  for (const key of CHANNEL_TOMADOR_ADDRESS_FIELDS) {
+    const v = fields[key];
+    if (key === "tomador_zip") {
+      if (onlyDigits(v).length !== 8) missing.push(key);
+      continue;
+    }
+    if (key === "tomador_city_ibge") {
+      if (!normalizeIbge(v)) missing.push(key);
+      continue;
+    }
+    if (!v || String(v).trim() === "") missing.push(key);
+  }
+  return missing;
+}
+
 const MISSING_LABELS: Partial<Record<keyof ChannelLabeledFields, string>> = {
   tomador_name: "nome do cliente",
   tomador_document: "CPF ou CNPJ",
+  tomador_street: "logradouro do tomador",
+  tomador_number: "numero do tomador",
+  tomador_district: "bairro do tomador",
+  tomador_zip: "CEP do tomador",
+  tomador_city_ibge: "codigo IBGE do municipio do tomador",
   amount_label: "valor do serviço",
   description: "descrição do serviço",
   competence_label: "data da prestação",
@@ -237,7 +330,9 @@ const MISSING_LABELS: Partial<Record<keyof ChannelLabeledFields, string>> = {
 
 export function buildV11aMissingReply(
   contactName: string | undefined,
-  missing: (typeof CHANNEL_V11A_REQUIRED)[number][],
+  missing: Array<
+    (typeof CHANNEL_V11A_REQUIRED)[number] | (typeof CHANNEL_TOMADOR_ADDRESS_FIELDS)[number]
+  >,
 ): string {
   const saudacao = (contactName || "Cliente").trim();
   const lista = missing.map((f) => `* ${MISSING_LABELS[f] ?? f}.`).join("\n");
@@ -276,6 +371,11 @@ export function buildV11aConfirmationReply(fields: ChannelLabeledFields): string
   if (fields.tomador_state?.trim()) linhas.push(`* UF do tomador: ${fields.tomador_state}`);
   if (fields.tomador_zip?.trim()) linhas.push(`* CEP do tomador: ${fields.tomador_zip}`);
 
-  linhas.push("", "Se estiver tudo certo, responda CONFIRMAR.");
+  linhas.push(
+    "",
+    "_Na emissão, nome e endereço do tomador vêm do cadastro master data vinculado ao documento._",
+    "",
+    "Se estiver tudo certo, responda CONFIRMAR.",
+  );
   return linhas.join("\n");
 }

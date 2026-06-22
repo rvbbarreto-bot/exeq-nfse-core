@@ -40,14 +40,42 @@ describe("channel-message-parser", () => {
     expect(r.patch.ibge_code).toBe("3504107");
   });
 
-  it("monta resumo quando draft pronto", () => {
+  it("não monta resumo de confirmação sem tomador V11A", () => {
     const msg = buildChannelCollectReply([], {
       amount_cents: 100,
       description: "Consultoria",
       ibge_code: "3504107",
+      provider_id: "p1",
+      service_id: "s1",
+      competence_date: "2026-06-22",
     });
-    expect(msg).toContain("confirmar");
-    expect(msg).toContain("R$ 1.00");
+    expect(msg).not.toContain("Resumo da NFS-e");
+    expect(msg).not.toContain("confirmar para emitir");
+    expect(msg.toLowerCase()).toMatch(/cliente|documento|valor/);
+  });
+
+  it("detecta pergunta sobre dados obrigatórios como unknown (resposta = campos faltantes)", () => {
+    expect(parseChannelMessageText("Quais os dados que preciso enviar?").intent).toBe("unknown");
+    expect(parseChannelMessageText("Me fala pf.").intent).toBe("unknown");
+  });
+
+  it("extrai valor coloquial mil reais", () => {
+    expect(parseChannelMessageText("mil reais").patch.amount_cents).toBe(100_000);
+    expect(parseChannelMessageText("valor de mil reais").patch.amount_cents).toBe(100_000);
+    expect(parseChannelMessageText("valor mil reais").patch.amount_cents).toBe(100_000);
+  });
+
+  it('não trata "mil reais" como descrição após intenção de emissão', () => {
+    const r = parseChannelMessageText("mil reais", {
+      currentDraft: { tomador_name: "João" },
+    });
+    expect(r.patch.amount_cents).toBe(100_000);
+    expect(r.patch.description).toBeUndefined();
+  });
+
+  it('não trata "emitir uma nots" como descrição fiscal', () => {
+    const r = parseChannelMessageText("Emitir uma nots");
+    expect(r.patch.description).toBeUndefined();
   });
 
   it("extrai CNPJ formatado e valor em mensagem livre", () => {

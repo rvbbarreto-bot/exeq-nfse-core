@@ -1,8 +1,6 @@
 import {
   buildChannelCollectReply,
-  buildChannelHelpReply,
   buildContinuesListeningReply,
-  buildEmissionIntentReply,
   buildGreetingReply,
   buildPendingReviewReply,
   buildServiceAmbiguityReply,
@@ -30,10 +28,13 @@ import {
   getChannelSession,
   setChannelSessionPendingReview,
 } from "./channel.service.js";
+import { applyChannelFiscalPreviewGate } from "./channel-fiscal-preview.service.js";
 import { confirmChannelSession } from "./confirm-channel-session.use-case.js";
 import {
   extractFieldsWithLlm,
   fetchRecentConversationHistory,
+  filterLlmDraftPatch,
+  filterLlmTomadorPatch,
   llmOutputToRawDraftPatch,
   recordLlmLog,
   shouldAttemptLlmFallback,
@@ -69,6 +70,7 @@ async function mergeAndResolveDraft(
   if (JSON.stringify(resolved) !== JSON.stringify(session.draft_payload)) {
     session = await collectChannelSessionDraft(db, tenantId, sessionId, resolved);
   }
+  session = await applyChannelFiscalPreviewGate(db, tenantId, sessionId);
   return session;
 }
 
@@ -124,6 +126,28 @@ function missingListAlreadySent(draft: ChannelDraft): boolean {
   return draft.conversation_flags?.missing_list_sent === true;
 }
 
+async function replyWithMissingFields(
+  db: Sql,
+  tenantId: string,
+  sessionId: string,
+  draft: ChannelDraft,
+  replyOpts: { contact_name?: string },
+  markSent: boolean,
+): Promise<string> {
+  if (markSent && !missingListAlreadySent(draft)) {
+    await mergeAndResolveDraft(db, tenantId, sessionId, {
+      conversation_flags: withConversationFlags(draft, {
+        missing_list_sent: true,
+        greeted: true,
+      }),
+    });
+    const refreshed = await getChannelSession(db, tenantId, sessionId);
+    return collectReplyForSession(refreshed, replyOpts);
+  }
+  const current = await getChannelSession(db, tenantId, sessionId);
+  return collectReplyForSession(current, replyOpts);
+}
+
 function serviceAmbiguityReply(draft: ChannelDraft): string | null {
   const options = draft.conversation_flags?.service_ambiguous_options;
   if (!options?.length) return null;
@@ -173,7 +197,7 @@ async function tryLlmExtractionFallback(
       return { consolidated, llmOutput, pendingReview: true };
     }
 
-    const llmPatch = llmOutputToRawDraftPatch(llmOutput);
+    const llmPatch = filterLlmDraftPatch(llmOutputToRawDraftPatch(llmOutput), messageText);
     const next = { ...consolidated };
 
     if (llmOutput.intent === "confirm") next.hasConfirm = true;
@@ -281,7 +305,15 @@ export async function processChannelInbound(
   }
 
   if (consolidated.hasHelp) {
-    return finish({ status: session.status, reply_text: buildChannelHelpReply(), emitted: false });
+    const reply = await replyWithMissingFields(
+      db,
+      tenantId,
+      session.id,
+      currentDraft,
+      replyOpts,
+      true,
+    );
+    return finish({ status: session.status, reply_text: reply, emitted: false });
   }
 
   if (consolidated.hasCancel) {
@@ -313,10 +345,6 @@ export async function processChannelInbound(
   }
 
   if (Object.keys(consolidated.mergedPatch).length > 0) {
-    const hasEmissionIntent =
-      consolidated.intents.includes("emission_intent") ||
-      consolidated.trailingSocialIntent === "emission_intent";
-
     await mergeAndResolveDraft(db, tenantId, session.id, {
       ...consolidated.mergedPatch,
       conversation_flags: withConversationFlags(currentDraft, {
@@ -330,31 +358,15 @@ export async function processChannelInbound(
       if (ambiguity) {
         return finish({ status: current.status, reply_text: ambiguity, emitted: false });
       }
-      if (hasEmissionIntent && !missingListAlreadySent(current.draft_payload)) {
-        return finish({
-          status: current.status,
-          reply_text: buildEmissionIntentReply(displayName ?? undefined),
-          emitted: false,
-        });
-      }
-      if (!missingListAlreadySent(current.draft_payload)) {
-        await mergeAndResolveDraft(db, tenantId, session.id, {
-          conversation_flags: withConversationFlags(current.draft_payload, {
-            missing_list_sent: true,
-          }),
-        });
-        const refreshed = await getChannelSession(db, tenantId, session.id);
-        return finish({
-          status: refreshed.status,
-          reply_text: collectReplyForSession(refreshed, replyOpts),
-          emitted: false,
-        });
-      }
-      return finish({
-        status: current.status,
-        reply_text: collectReplyForSession(current, replyOpts),
-        emitted: false,
-      });
+      const reply = await replyWithMissingFields(
+        db,
+        tenantId,
+        session.id,
+        current.draft_payload,
+        replyOpts,
+        !missingListAlreadySent(current.draft_payload),
+      );
+      return finish({ status: current.status, reply_text: reply, emitted: false });
     }
   }
 
@@ -435,41 +447,37 @@ export async function processChannelInbound(
     consolidated.socialOnly &&
     consolidated.trailingSocialIntent === "emission_intent"
   ) {
-    if (isConversationStarted(currentDraft)) {
-      const reply = missingListAlreadySent(currentDraft)
-        ? buildContinuesListeningReply(displayName ?? undefined)
-        : buildEmissionIntentReply(displayName ?? undefined);
-      if (!currentDraft.conversation_flags?.greeted) {
-        await markGreeted();
-      }
-      return finish({ status: session.status, reply_text: reply, emitted: false });
+    if (!currentDraft.conversation_flags?.greeted) {
+      await markGreeted();
     }
-
-    await markGreeted();
-    return finish({
-      status: session.status,
-      reply_text: buildEmissionIntentReply(displayName ?? undefined),
-      emitted: false,
-    });
+    const reply = await replyWithMissingFields(
+      db,
+      tenantId,
+      session.id,
+      currentDraft,
+      replyOpts,
+      !missingListAlreadySent(currentDraft),
+    );
+    return finish({ status: session.status, reply_text: reply, emitted: false });
   }
 
   const current = await getChannelSession(db, tenantId, session.id);
-  const missing = current.missing_fields;
-  const v11aPartial = current.draft_payload.tomador_name || current.draft_payload.amount_cents;
+  const hasPartialData =
+    Object.keys(consolidated.mergedPatch).length > 0 ||
+    Boolean(current.draft_payload.tomador_name) ||
+    Boolean(current.draft_payload.amount_cents) ||
+    Boolean(current.draft_payload.tomador_document);
 
-  if (v11aPartial && missing.length > 0 && !missingListAlreadySent(current.draft_payload)) {
-    await mergeAndResolveDraft(db, tenantId, session.id, {
-      conversation_flags: withConversationFlags(current.draft_payload, {
-        missing_list_sent: true,
-        greeted: true,
-      }),
-    });
-    const refreshed = await getChannelSession(db, tenantId, session.id);
-    return finish({
-      status: refreshed.status,
-      reply_text: collectReplyForSession(refreshed, replyOpts),
-      emitted: false,
-    });
+  if (hasPartialData || isConversationStarted(current.draft_payload)) {
+    const reply = await replyWithMissingFields(
+      db,
+      tenantId,
+      session.id,
+      current.draft_payload,
+      replyOpts,
+      !missingListAlreadySent(current.draft_payload),
+    );
+    return finish({ status: current.status, reply_text: reply, emitted: false });
   }
 
   if (!isConversationStarted(current.draft_payload)) {
@@ -502,9 +510,14 @@ export async function processChannelInbound(
     });
   }
 
-  const unknownReply = missingListAlreadySent(current.draft_payload)
-    ? `${buildContinuesListeningReply(displayName ?? undefined)}\n\nNão entendi esta mensagem. Pode enviar um dado por vez (valor, documento, cidade, serviço…).\n\nDigite *ajuda* se precisar.`
-    : `${buildShortGreetingAck(displayName ?? undefined)}\n\nNão entendi esta mensagem. ${collectReplyForSession(current, replyOpts)}\n\nDigite *ajuda* se precisar.`;
+  const unknownReply = await replyWithMissingFields(
+    db,
+    tenantId,
+    session.id,
+    current.draft_payload,
+    replyOpts,
+    !missingListAlreadySent(current.draft_payload),
+  );
 
   return finish({
     status: current.status,

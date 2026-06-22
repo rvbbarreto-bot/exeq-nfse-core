@@ -1,4 +1,5 @@
 import type { ChannelDraft } from "./channel.js";
+import { mergeChannelDraftPatch } from "./channel.js";
 import {
   type ChannelMessageIntent,
   type ParsedChannelMessage,
@@ -32,7 +33,14 @@ function mergeDraft(
   base: ChannelDraft | undefined,
   patch: Partial<ChannelDraft>,
 ): ChannelDraft {
-  return { ...(base ?? {}), ...patch };
+  return mergeChannelDraftPatch(base, patch);
+}
+
+function mergePartialDraft(
+  base: Partial<ChannelDraft>,
+  patch: Partial<ChannelDraft>,
+): Partial<ChannelDraft> {
+  return mergeChannelDraftPatch(base, patch);
 }
 
 /**
@@ -90,7 +98,7 @@ export function parseConsolidatedChannelMessages(
     if (parsed.intent === "repeat_last") hasRepeatLast = true;
 
     if (parsed.intent === "inform" && Object.keys(parsed.patch).length > 0) {
-      Object.assign(mergedPatch, parsed.patch);
+      Object.assign(mergedPatch, mergePartialDraft(mergedPatch, parsed.patch));
       rollingDraft = mergeDraft(rollingDraft, parsed.patch);
       dataLines += 1;
       trailingSocialIntent = null;

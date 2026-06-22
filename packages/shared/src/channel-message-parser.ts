@@ -1,9 +1,11 @@
 import type { ChannelDraft } from "./channel.js";
+import { isChannelDraftReadyForConfirm } from "./channel.js";
 import {
   buildV11aConfirmationReply,
   buildV11aMissingReply,
   extractLabeledChannelFields,
   getMissingV11aFields,
+  getMissingTomadorAddressFields,
   onlyDigits,
   parseAmountCentsFromLabel,
   parseAmountCentsFromFreeformText,
@@ -11,8 +13,14 @@ import {
   type ChannelLabeledFields,
 } from "./channel-labeled-parser.js";
 import {
+  appendTaxPreviewToConfirmation,
+  buildChannelTaxPreviewBlockedReply,
+  type ChannelTaxPreviewSummary,
+} from "./channel-tax-preview.js";
+import {
   type ChannelMessageIntent,
   type ParsedChannelMessage,
+  isDataRequestMessage,
   parseServicePrefixText,
   patchFromContextualMessage,
   patchSingleMissingField,
@@ -27,6 +35,8 @@ export {
   buildShortGreetingAck,
   firstName,
   isConversationStarted,
+  isDataRequestMessage,
+  isVagueEmissionPhrase,
   looksLikeFiscalServiceCode,
   parseServicePrefixText,
   patchFromContextualMessage,
@@ -50,13 +60,21 @@ const REPEAT_LAST_RE =
   /^(sim[,!.]?\s*)?(mesmos?\s*dados|repetir|igual\s+a\s+ultima|igual\s+anterior|ultima\s+nota|mesma\s+nota|pode\s+ser|isso|confirmo)/i;
 
 function parseDescription(text: string): string | undefined {
+  const normalized = text.trim();
+  if (/^emitir\s+(uma\s+)?no?ts?\s*$/i.test(normalized)) return undefined;
+  if (EMISSION_INTENT_RE.test(normalized)) return undefined;
+
   const servicePrefix = parseServicePrefixText(text);
   if (servicePrefix?.description) return servicePrefix.description;
 
   const labeled = text.match(/(?:descri[cç][aã]o|servi[cç]o|servico)\s*[:\-]\s*(.+)$/i);
   if (labeled?.[1]?.trim()) return labeled[1].trim().slice(0, 2000);
   const free = text.match(/^emitir\s+(.+)$/i);
-  if (free?.[1]?.trim() && free[1].trim().length >= 3) return free[1].trim().slice(0, 2000);
+  if (free?.[1]?.trim()) {
+    const tail = free[1].trim();
+    if (/^(uma\s+)?(no?ts?|nota)\s*$/i.test(tail)) return undefined;
+    return tail.slice(0, 2000);
+  }
   return undefined;
 }
 
@@ -154,12 +172,12 @@ export function parseChannelMessageText(
   }
   const amount = parseAmountCentsFromFreeformText(normalized);
   if (amount != null && amount > 0) patch.amount_cents = amount;
-  const description = parseDescription(normalized);
-  if (description) patch.description = description;
-  const servicePrefixInline = parseServicePrefixText(normalized);
-  if (servicePrefixInline?.service_hint) patch.service_hint = servicePrefixInline.service_hint;
   const competence = parseCompetenceIsoFromLabel(normalized);
   if (competence) patch.competence_date = competence;
+  const description = parseDescription(normalized);
+  if (description && !competence) patch.description = description;
+  const servicePrefixInline = parseServicePrefixText(normalized);
+  if (servicePrefixInline?.service_hint) patch.service_hint = servicePrefixInline.service_hint;
   const ibge = resolveMunicipioIbgeFromText(normalized);
   if (ibge) patch.ibge_code = ibge;
 
@@ -188,7 +206,16 @@ export function buildChannelCollectReply(
   draft: ChannelDraft,
   options?: { contact_name?: string; labeled?: ChannelLabeledFields },
 ): string {
-  if (missing.length === 0) {
+  const taxBlock = draft.conversation_flags?.tax_preview_block;
+  if (missing.length === 0 && taxBlock) {
+    return buildChannelTaxPreviewBlockedReply(taxBlock);
+  }
+
+  const taxSummary = draft.conversation_flags?.tax_preview_summary as
+    | ChannelTaxPreviewSummary
+    | undefined;
+
+  if (missing.length === 0 && isChannelDraftReadyForConfirm(draft)) {
     const labeled: ChannelLabeledFields = options?.labeled ?? {
       tomador_name: draft.tomador_name,
       tomador_document: draft.tomador_document,
@@ -210,22 +237,11 @@ export function buildChannelCollectReply(
       tomador_zip: draft.tomador_address?.zip_code,
     };
 
-    if (labeled.tomador_name && labeled.tomador_document) {
-      return buildV11aConfirmationReply(labeled);
-    }
-
-    const valor = draft.amount_cents != null ? (draft.amount_cents / 100).toFixed(2) : "?";
-    const cidade = municipioLabelFromIbge(draft.ibge_code) ?? draft.ibge_code ?? "—";
-    return (
-      `Resumo da NFS-e:\n` +
-      `- Valor: R$ ${valor}\n` +
-      `- Serviço: ${draft.description ?? "(padrão)"}\n` +
-      `- Cidade: ${cidade}\n\n` +
-      `Responda *confirmar* para emitir ou *cancelar* para desistir.`
-    );
+    const base = buildV11aConfirmationReply(labeled);
+    return taxSummary?.ready ? appendTaxPreviewToConfirmation(base, taxSummary) : base;
   }
 
-  const v11aMissing = getMissingV11aFields({
+  const labeled: ChannelLabeledFields = options?.labeled ?? {
     tomador_name: draft.tomador_name,
     tomador_document: draft.tomador_document,
     amount_label:
@@ -234,10 +250,21 @@ export function buildChannelCollectReply(
     competence_label: draft.competence_date,
     service_code: draft.service_code,
     ibge_code: draft.ibge_code,
-  });
+    tomador_street: draft.tomador_address?.street,
+    tomador_number: draft.tomador_address?.number,
+    tomador_complement: draft.tomador_address?.complement,
+    tomador_district: draft.tomador_address?.district,
+    tomador_city_ibge: draft.tomador_address?.ibge_code,
+    tomador_state: draft.tomador_address?.state,
+    tomador_zip: draft.tomador_address?.zip_code,
+  };
 
-  if (v11aMissing.length > 0) {
-    return buildV11aMissingReply(options?.contact_name, v11aMissing);
+  const v11aMissing = getMissingV11aFields(labeled);
+  const addressMissing = getMissingTomadorAddressFields(labeled);
+  const allMissing = [...v11aMissing, ...addressMissing];
+
+  if (allMissing.length > 0) {
+    return buildV11aMissingReply(options?.contact_name, allMissing);
   }
 
   const hints: Record<string, string> = {

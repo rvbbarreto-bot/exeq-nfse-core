@@ -9,6 +9,7 @@ const NAV_ACCORDION_GROUP: Record<string, string> = {
   "nav-catalogs": "Fiscal",
   "nav-master-data": "Fiscal",
   "nav-das-guias": "Fiscal",
+  "nav-fiscal-backfill-snapshots": "Fiscal",
   "nav-webhooks": "Operacao",
 };
 

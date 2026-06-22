@@ -51,6 +51,7 @@ describe("admin-nav — sidebar accordion", () => {
   it("gera data-testid estavel para links", () => {
     expect(navTestId("/")).toBe("nav-dashboard");
     expect(navTestId("/master-data")).toBe("nav-master-data");
+    expect(navTestId("/fiscal/backfill-snapshots")).toBe("nav-fiscal-backfill-snapshots");
   });
 
   it("isNavPathActive trata dashboard como exato", () => {

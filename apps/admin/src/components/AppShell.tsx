@@ -19,11 +19,13 @@ function SidebarNavGroups({
   pathname,
   openGroupIds,
   onToggleGroup,
+  roles,
 }: {
   groups: AdminNavGroup[];
   pathname: string;
   openGroupIds: Set<string>;
   onToggleGroup: (groupId: string) => void;
+  roles: string[];
 }) {
   return (
     <nav className="sidebar__nav" aria-label="Menu principal">
@@ -49,7 +51,9 @@ function SidebarNavGroups({
             </button>
             {open ? (
               <div id={panelId} className="sidebar-accordion__panel" role="group" aria-label={group.label}>
-                {group.items.map((item) => {
+                {group.items
+                  .filter((item) => !item.adminOnly || roles.includes("tenant_admin"))
+                  .map((item) => {
                   const active = isNavLinkActive(pathname, item.to, groups);
                   return (
                     <Link
@@ -157,6 +161,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           pathname={location.pathname}
           openGroupIds={openGroupIds}
           onToggleGroup={toggleGroup}
+          roles={roles}
         />
         <div className="sidebar__footer">
           <span className="sidebar__roles">{roles.join(", ") || "admin"}</span>

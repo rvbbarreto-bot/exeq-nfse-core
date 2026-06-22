@@ -11,6 +11,7 @@ import { taxRoutes } from "./modules/fiscal/tax.routes.js";
 import { catalogRoutes } from "./modules/fiscal/catalog.routes.js";
 import { dasRoutes } from "./modules/das/das.routes.js";
 import { municipalRulesRoutes } from "./modules/fiscal/municipal-rules/municipal-rules.routes.js";
+import { fiscalOpsRoutes } from "./modules/fiscal/fiscal-ops.routes.js";
 import { masterDataRoutes } from "./modules/master-data/master-data.routes.js";
 import { nfIssueRoutes } from "./modules/issuance/nf-issue.routes.js";
 import { chargeRoutes } from "./modules/billing/charge.routes.js";
@@ -79,6 +80,7 @@ export async function buildApp() {
   await app.register(masterDataRoutes);
   await app.register(catalogRoutes);
   await app.register(municipalRulesRoutes);
+  await app.register(fiscalOpsRoutes);
   await app.register(nfIssueRoutes);
   await app.register(chargeRoutes);
   await app.register(webhookRoutes);

@@ -6,6 +6,7 @@ import {
   homologEnv,
   webhookPaymentPaid,
 } from "./helpers/homolog-env.js";
+import { clickNav, ensureNavVisible } from "./helpers/nav.js";
 
 async function loginAdmin(page: import("@playwright/test").Page) {
   await page.goto("/login", { waitUntil: "networkidle" });
@@ -21,21 +22,21 @@ const PILOT_IBGE_SORTED = ["3504107", "3507605", "3528502", "3547809"];
 test.describe("Homolog portal — escopo PO 4 municípios", () => {
   test("UAT-P0-01 — login e dashboard", async ({ page }) => {
     await loginAdmin(page);
-    await expect(page.getByRole("heading", { name: /dashboard operacao/i })).toBeVisible();
-    await expect(page.getByTestId("nav-charges")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /dashboard operacional/i })).toBeVisible();
+    await ensureNavVisible(page, "nav-charges");
   });
 
   test("UAT-P0-02 — lista de cobranças", async ({ page }) => {
     await loginAdmin(page);
-    await page.getByTestId("nav-charges").click();
+    await clickNav(page, "nav-charges");
     await expect(page.getByTestId("page-charges")).toBeVisible();
-    await expect(page.getByRole("heading", { name: /cobranças/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /cobrancas/i })).toBeVisible();
     await expect(page.getByRole("table")).toBeVisible();
   });
 
   test("UAT-P0-03 — filtro emissões com 4 municípios piloto (UAT-20)", async ({ page }) => {
     await loginAdmin(page);
-    await page.getByTestId("nav-issues").click();
+    await clickNav(page, "nav-issues");
     await expect(page.getByTestId("page-issues")).toBeVisible();
     const municipio = page.getByTestId("filter-municipio");
     await expect(municipio).toBeVisible();

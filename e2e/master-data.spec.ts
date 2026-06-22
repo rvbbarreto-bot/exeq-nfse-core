@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
 import { loginAdmin } from "./helpers/login.js";
+import { clickNav } from "./helpers/nav.js";
 
 test.describe("S1-07 — Cadastros /master-data", () => {
   test("S1-07-B1 — abas prestador, tomador e serviço", async ({ page }) => {
     await loginAdmin(page);
-    await page.getByTestId("nav-master-data").click();
+    await clickNav(page, "nav-master-data");
     await expect(page.getByTestId("page-master-data")).toBeVisible();
     await expect(page.getByRole("heading", { name: /^cadastros$/i })).toBeVisible();
 
@@ -17,7 +18,7 @@ test.describe("S1-07 — Cadastros /master-data", () => {
 
   test("S1-07-B2 — lista tomadores", async ({ page }) => {
     await loginAdmin(page);
-    await page.getByTestId("nav-master-data").click();
+    await clickNav(page, "nav-master-data");
     await page.getByTestId("tab-customers").click();
     await expect(page.getByRole("heading", { name: /novo tomador/i })).toBeVisible();
     await expect(page.getByRole("table")).toBeVisible();
@@ -26,7 +27,7 @@ test.describe("S1-07 — Cadastros /master-data", () => {
 
   test("S1-07-B3 — lista serviços", async ({ page }) => {
     await loginAdmin(page);
-    await page.getByTestId("nav-master-data").click();
+    await clickNav(page, "nav-master-data");
     await page.getByTestId("tab-services").click();
     await expect(page.getByRole("heading", { name: /novo servico/i })).toBeVisible();
     await expect(page.getByRole("table")).toBeVisible();

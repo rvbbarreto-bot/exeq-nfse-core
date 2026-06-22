@@ -1,3 +1,5 @@
+import type { EmitDasGuiaInput, GuiaFiscalResponse } from "@exeq/shared";
+
 const API_BASE = "";
 
 export class ApiError extends Error {
@@ -291,6 +293,25 @@ export const api = {
     body: { service_code: string; description: string; lc116_item?: string },
   ) {
     return request<ServiceListItem>("/v1/services", {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  listDasGuias(token: string, query: Record<string, string> = {}) {
+    const qs = new URLSearchParams(query).toString();
+    const path = qs ? `/v1/das/guias?${qs}` : "/v1/das/guias";
+    return request<{ guias: GuiaFiscalResponse[]; next_cursor: string | null }>(path, { token });
+  },
+
+  getDasGuia(token: string, id: string) {
+    return request<{ guia: GuiaFiscalResponse }>(`/v1/das/guias/${id}`, { token });
+  },
+
+  emitDasGuia(token: string, body: EmitDasGuiaInput) {
+    return request<{ guia: GuiaFiscalResponse; deduplicated?: boolean }>("/v1/das/emitir", {
       method: "POST",
       token,
       headers: { "Content-Type": "application/json" },

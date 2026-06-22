@@ -43,6 +43,11 @@ describe("admin-nav — sidebar accordion", () => {
     expect(open).toContain("ops");
   });
 
+  it("abre grupo fiscal para rota DAS", () => {
+    const open = defaultOpenGroupIds("/das/guias", ADMIN_NAV_GROUPS);
+    expect(open).toContain("fiscal");
+  });
+
   it("gera data-testid estavel para links", () => {
     expect(navTestId("/")).toBe("nav-dashboard");
     expect(navTestId("/master-data")).toBe("nav-master-data");

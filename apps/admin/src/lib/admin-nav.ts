@@ -30,6 +30,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       { to: "/catalogs", label: "Catalogos" },
       { to: "/master-data", label: "Cadastros" },
+      { to: "/das/guias", label: "Guias DAS/DARF" },
     ],
   },
   {

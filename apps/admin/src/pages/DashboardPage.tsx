@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
 import { AppShell } from "../components/AppShell.js";
+import { PortalPage } from "../components/PortalPage.js";
+import { PortalPageHeader } from "../components/PortalPageHeader.js";
 import { buildChargeDashboardKpis } from "../lib/charge-dashboard.js";
 import { buildDashboardKpis, topStatusBreakdown } from "../lib/dashboard.js";
 import {
@@ -45,49 +47,70 @@ export function DashboardPage() {
   const showAlerts = alerts && hasActiveAlerts(alerts);
   const hypercareTotal = alerts ? hypercareAlertTotal(alerts) : 0;
 
+  const gatewayBadge = healthQuery.data?.gateway ? (
+    <span
+      className={`pill ${healthQuery.data.gateway.mock ? "warn" : "ok"}`}
+      data-testid="gateway-integration-badge"
+      title={healthQuery.data.gateway.base_url}
+    >
+      Gateway: {healthQuery.data.gateway.mock ? "Mock" : "HTTP"}
+      {healthQuery.data.gateway.sync_processing ? " · sync" : ""}
+    </span>
+  ) : null;
+
   return (
     <AppShell>
-      <main className="page" data-testid="page-dashboard">
-        <div className="row">
-          <h1>Dashboard operacao</h1>
-          <div className="row">
-            <Link to="/issues">Emissoes</Link>
-            <Link to="/charges">Cobrancas</Link>
-          </div>
-        </div>
-        {summaryQuery.isLoading && <p>Carregando metricas...</p>}
+      <PortalPage testId="page-dashboard" variant="dashboard">
+        <PortalPageHeader
+          title="Dashboard operacional"
+          description="Emissao NFS-e, cobranca e triagem hypercare — indicadores consolidados do tenant."
+          actions={
+            <>
+              {gatewayBadge}
+              <Link to="/issues" className="btn-portal-primary">
+                Emissoes
+              </Link>
+              <Link to="/charges" className="btn-portal-primary">
+                Cobrancas
+              </Link>
+              <Link to="/das/guias" className="btn-portal-primary">
+                Guias DAS
+              </Link>
+            </>
+          }
+        />
+
+        {summaryQuery.isLoading && <p className="muted">Carregando metricas…</p>}
         {summaryQuery.error && <p className="error">Erro ao carregar dashboard</p>}
 
-        {healthQuery.data?.gateway && (
-          <p
-            className={`pill ${healthQuery.data.gateway.mock ? "warn" : "ok"}`}
-            data-testid="gateway-integration-badge"
-            title={healthQuery.data.gateway.base_url}
-          >
-            Gateway: {healthQuery.data.gateway.mock ? "Mock" : "HTTP"}
-            {healthQuery.data.gateway.sync_processing ? " · sync" : ""}
-          </p>
-        )}
-
         {alerts && (
-          <section className="card alert-banner" data-testid="dashboard-hypercare">
-            <h2>Hypercare — triagem operacional</h2>
-            <p className="muted">
+          <section className="dash-panel" data-testid="dashboard-hypercare">
+            <h2 className="dash-panel__title">Hypercare — triagem operacional</h2>
+            <p className="dash-panel__sub">
               {showAlerts
                 ? `${hypercareTotal} item(ns) para revisar — clique para abrir a lista filtrada.`
                 : "Nenhum alerta ativo no momento."}
             </p>
-            <div className="grid kpi-grid">
+            <div className="dash-kpi-grid">
               {alertCards.map((card) => (
-                <article
+                <div
                   key={card.key}
-                  className={`card kpi alert-${card.severity} ${card.value === 0 ? "muted-kpi" : ""}`}
+                  className={`dash-kpi ${card.value === 0 ? "muted-kpi" : ""}`}
                   data-testid={`hypercare-alert-${card.key}`}
                 >
-                  <p className="kpi-label">{card.label}</p>
-                  <p className="kpi-value">{card.value}</p>
-                  {card.value > 0 && <Link to={card.href}>Ver lista</Link>}
-                </article>
+                  <p className="dash-kpi__label">{card.label}</p>
+                  <p className="dash-kpi__value">{card.value}</p>
+                  {card.value > 0 ? (
+                    <>
+                      <span className={`dash-kpi__badge dash-kpi__badge--${card.severity === "critical" ? "red" : "orange"}`}>
+                        Revisar
+                      </span>
+                      <Link to={card.href} className="fiscal-dash__all-link">
+                        Ver lista
+                      </Link>
+                    </>
+                  ) : null}
+                </div>
               ))}
             </div>
           </section>
@@ -95,60 +118,68 @@ export function DashboardPage() {
 
         {stats && (
           <>
-            <section className="grid kpi-grid">
+            <div className="dash-kpi-grid">
               {kpis.map((kpi) => (
-                <article key={kpi.key} className={`card kpi ${kpi.hint ?? ""}`}>
-                  <p className="kpi-label">{kpi.label}</p>
-                  <p className="kpi-value">{kpi.value}</p>
-                </article>
+                <div key={kpi.key} className={`dash-kpi ${kpi.hint ?? ""}`}>
+                  <p className="dash-kpi__label">{kpi.label}</p>
+                  <p className="dash-kpi__value">{kpi.value}</p>
+                </div>
               ))}
-            </section>
+            </div>
 
             {chargeStats && (
-              <section className="grid kpi-grid">
+              <div className="dash-kpi-grid">
                 {chargeKpis.map((kpi) => (
-                  <article key={kpi.key} className={`card kpi ${kpi.hint ?? ""}`}>
-                    <p className="kpi-label">{kpi.label}</p>
-                    <p className="kpi-value">{kpi.value}</p>
-                    {kpi.filterStatus && (
-                      <Link to={`/charges?status=${kpi.filterStatus}`}>Ver lista</Link>
-                    )}
-                  </article>
+                  <div key={kpi.key} className={`dash-kpi ${kpi.hint ?? ""}`}>
+                    <p className="dash-kpi__label">{kpi.label}</p>
+                    <p className="dash-kpi__value">{kpi.value}</p>
+                    {kpi.filterStatus ? (
+                      <Link to={`/charges?status=${kpi.filterStatus}`} className="fiscal-dash__all-link">
+                        Ver lista
+                      </Link>
+                    ) : null}
+                  </div>
                 ))}
-              </section>
+              </div>
             )}
 
-            <div className="grid two-col">
-              <section className="card">
-                <h2>Emissoes por status</h2>
-                <ul className="stat-list">
+            <div className="dash-mid">
+              <section className="dash-panel">
+                <h2 className="dash-panel__title">Emissoes por status</h2>
+                <ul className="fiscal-dash__list">
                   {breakdown.map((row) => (
-                    <li key={row.status}>
-                      <span className={`pill ${issueStatusClass(row.status)}`}>
-                        {formatIssueStatus(row.status)}
+                    <li key={row.status} className="fiscal-dash__list-item">
+                      <span className="fiscal-dash__list-link">
+                        <span className="fiscal-dash__list-main">
+                          <span className={`pill ${issueStatusClass(row.status)}`}>
+                            {formatIssueStatus(row.status)}
+                          </span>
+                        </span>
+                        <strong>{row.count}</strong>
                       </span>
-                      <strong>{row.count}</strong>
                     </li>
                   ))}
                 </ul>
               </section>
 
-              <section className="card">
-                <h2>Municipios piloto</h2>
-                <ul className="stat-list">
+              <section className="dash-panel">
+                <h2 className="dash-panel__title">Municipios piloto</h2>
+                <ul className="fiscal-dash__list">
                   {stats.pilot_municipios.map((m) => (
-                    <li key={m.ibge_code}>
-                      <span>{m.label}</span>
-                      <strong>{m.count}</strong>
+                    <li key={m.ibge_code} className="fiscal-dash__list-item">
+                      <span className="fiscal-dash__list-link">
+                        <span className="fiscal-dash__list-main">{m.label}</span>
+                        <strong>{m.count}</strong>
+                      </span>
                     </li>
                   ))}
                 </ul>
               </section>
             </div>
 
-            <section className="card">
-              <h2>Emissoes recentes</h2>
-              {recentQuery.isLoading && <p className="muted">Carregando...</p>}
+            <section className="dash-panel">
+              <h2 className="dash-panel__title">Emissoes recentes</h2>
+              {recentQuery.isLoading && <p className="muted">Carregando…</p>}
               <table className="table">
                 <thead>
                   <tr>
@@ -177,10 +208,13 @@ export function DashboardPage() {
                   ))}
                 </tbody>
               </table>
+              <Link to="/issues" className="fiscal-dash__all-link">
+                Ver todas as emissoes
+              </Link>
             </section>
           </>
         )}
-      </main>
+      </PortalPage>
     </AppShell>
   );
 }

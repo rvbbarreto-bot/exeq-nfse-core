@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { AppShell } from "../components/AppShell.js";
+import { PortalPage } from "../components/PortalPage.js";
+import { PortalPageHeader } from "../components/PortalPageHeader.js";
 import { getToken } from "../lib/auth.js";
 import {
   buildChargesQuery,
@@ -69,10 +71,13 @@ export function ChargesPage() {
 
   return (
     <AppShell>
-      <main className="page" data-testid="page-charges">
-        <h1>Cobranças</h1>
+      <PortalPage testId="page-charges">
+        <PortalPageHeader
+          title="Cobrancas"
+          description="Gateway de cobranca — status, correlation ID e exportacao CSV."
+        />
 
-        <section className="card filters">
+        <section className="dash-panel filters">
           <div className="grid filter-grid">
             <label>
               Status
@@ -177,7 +182,7 @@ export function ChargesPage() {
             {chargesQuery.isFetchingNextPage ? "Carregando..." : "Carregar mais"}
           </button>
         )}
-      </main>
+      </PortalPage>
     </AppShell>
   );
 }

@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { AppShell } from "../components/AppShell.js";
+import { PortalPage } from "../components/PortalPage.js";
+import { PortalPageHeader } from "../components/PortalPageHeader.js";
 import {
   buildIssuesQuery,
   FILTER_STATUS_OPTIONS,
@@ -96,10 +98,13 @@ export function IssuesPage() {
 
   return (
     <AppShell>
-      <main className="page" data-testid="page-issues">
-        <h1>Emissoes NFS-e</h1>
+      <PortalPage testId="page-issues">
+        <PortalPageHeader
+          title="Emissoes NFS-e"
+          description="Listagem paginada com filtros por status, municipio piloto e periodo."
+        />
 
-        <section className="card filters">
+        <section className="dash-panel filters">
           <div className="grid filter-grid">
             <label>
               Status
@@ -213,7 +218,7 @@ export function IssuesPage() {
             {issuesQuery.isFetchingNextPage ? "Carregando..." : "Carregar mais"}
           </button>
         )}
-      </main>
+      </PortalPage>
     </AppShell>
   );
 }

@@ -223,7 +223,8 @@ a {
 
 .shell-content {
   flex: 1;
-  padding: 0;
+  padding: 1.25rem 1.5rem;
+  background: var(--exeq-surface);
 }
 
 @media (max-width: 900px) {

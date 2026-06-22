@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { AppShell } from "../components/AppShell.js";
+import { PortalPage } from "../components/PortalPage.js";
+import { PortalPageHeader } from "../components/PortalPageHeader.js";
 import { getToken } from "../lib/auth.js";
 import {
   formatCompetencia,
@@ -40,7 +42,7 @@ export function DasGuiaDetailPage() {
 
   return (
     <AppShell>
-      <main className="page" data-testid="page-das-guia-detail">
+      <PortalPage testId="page-das-guia-detail">
         <p>
           <Link to="/das/guias">← Voltar para guias</Link>
         </p>
@@ -50,16 +52,16 @@ export function DasGuiaDetailPage() {
 
         {guia ? (
           <>
-            <div className="row">
-              <h1>
-                {formatTipoGuia(guia.tipo_guia)} — {formatCompetencia(guia.competencia)}
-              </h1>
-              <span className={`pill ${guiaStatusClass(guia.status)}`}>{formatGuiaStatus(guia.status)}</span>
-            </div>
+            <PortalPageHeader
+              title={`${formatTipoGuia(guia.tipo_guia)} — ${formatCompetencia(guia.competencia)}`}
+              actions={
+                <span className={`pill ${guiaStatusClass(guia.status)}`}>{formatGuiaStatus(guia.status)}</span>
+              }
+            />
 
-            <section className="grid two-col">
-              <article className="card">
-                <h2>Valores</h2>
+            <div className="dash-mid">
+              <article className="dash-panel">
+                <h2 className="dash-panel__title">Valores</h2>
                 <dl className="detail-list">
                   <div>
                     <dt>Principal</dt>
@@ -86,8 +88,8 @@ export function DasGuiaDetailPage() {
                 </dl>
               </article>
 
-              <article className="card">
-                <h2>Compliance</h2>
+              <article className="dash-panel">
+                <h2 className="dash-panel__title">Compliance</h2>
                 <dl className="detail-list">
                   <div>
                     <dt>Status</dt>
@@ -103,10 +105,10 @@ export function DasGuiaDetailPage() {
                   </div>
                 </dl>
               </article>
-            </section>
+            </div>
 
-            <section className="card">
-              <h2>Pagamento</h2>
+            <section className="dash-panel">
+              <h2 className="dash-panel__title">Pagamento</h2>
               <dl className="detail-list">
                 <div>
                   <dt>Linha digitavel</dt>
@@ -129,8 +131,8 @@ export function DasGuiaDetailPage() {
               </dl>
             </section>
 
-            <section className="card">
-              <h2>Metadados</h2>
+            <section className="dash-panel">
+              <h2 className="dash-panel__title">Metadados</h2>
               <dl className="detail-list">
                 <div>
                   <dt>ID</dt>
@@ -156,7 +158,7 @@ export function DasGuiaDetailPage() {
             </section>
           </>
         ) : null}
-      </main>
+      </PortalPage>
     </AppShell>
   );
 }

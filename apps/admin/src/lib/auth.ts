@@ -39,3 +39,7 @@ export function isAccountantOnly(): boolean {
   const roles = getUserRoles();
   return roles.includes("accountant") && !roles.includes("tenant_admin");
 }
+
+export function hasRole(role: string): boolean {
+  return getUserRoles().includes(role);
+}

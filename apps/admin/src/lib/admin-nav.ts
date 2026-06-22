@@ -1,6 +1,8 @@
 export type AdminNavLink = {
   to: string;
   label: string;
+  /** Visivel apenas para tenant_admin quando true */
+  adminOnly?: boolean;
 };
 
 export type AdminNavGroup = {
@@ -31,6 +33,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { to: "/catalogs", label: "Catalogos" },
       { to: "/master-data", label: "Cadastros" },
       { to: "/das/guias", label: "Guias DAS/DARF" },
+      { to: "/fiscal/backfill-snapshots", label: "Backfill snapshots", adminOnly: true },
     ],
   },
   {

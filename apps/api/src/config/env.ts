@@ -92,6 +92,16 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("true")
     .transform((v) => v === "true"),
+  /** RFC-0020 — desliga todas as feature flags fiscais por tenant. */
+  FISCAL_FLAGS_GLOBAL_DISABLE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  /** RFC-0020 — dual-write tax_snapshot na emissao e backfill. */
+  FISCAL_TAX_SNAPSHOT_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
   /** Gateway Receita: mock in-process (dev/test). */
   RECEITA_DAS_MOCK: z
     .enum(["true", "false"])

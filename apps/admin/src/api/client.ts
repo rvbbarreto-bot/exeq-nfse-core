@@ -318,6 +318,27 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
+
+  backfillTaxSnapshots(
+    token: string,
+    body: { days?: number; limit?: number; dry_run?: boolean },
+  ) {
+    return request<{
+      tenant_id: string;
+      tenant_slug?: string;
+      days: number;
+      candidates: number;
+      created: number;
+      skipped: number;
+      errors: number;
+      dry_run: boolean;
+    }>("/v1/fiscal/admin/backfill-snapshots", {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
 };
 
 export type NfIssueListItem = {

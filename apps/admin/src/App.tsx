@@ -10,6 +10,7 @@ import { ChargeDetailPage } from "./pages/ChargeDetailPage.js";
 import { ChargesPage } from "./pages/ChargesPage.js";
 import { DasGuiaDetailPage } from "./pages/DasGuiaDetailPage.js";
 import { DasGuiasPage } from "./pages/DasGuiasPage.js";
+import { BackfillSnapshotsPage } from "./pages/BackfillSnapshotsPage.js";
 import { IssueDetailPage } from "./pages/IssueDetailPage.js";
 import { IssuesPage } from "./pages/IssuesPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
@@ -130,6 +131,14 @@ export function App() {
             element={
               <PrivateRoute>
                 <DasGuiaDetailPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/fiscal/backfill-snapshots"
+            element={
+              <PrivateRoute>
+                <BackfillSnapshotsPage />
               </PrivateRoute>
             }
           />

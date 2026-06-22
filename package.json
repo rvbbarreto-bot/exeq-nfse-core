@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @exeq/shared && npm run build -w @exeq/api",
+    "build": "npm run build -w @exeq/shared && npm run build -w @exeq/fiscal-engine && npm run build -w @exeq/api",
     "dev": "npm run dev -w @exeq/api",
     "dev:admin": "npm run dev -w @exeq/admin",
     "typecheck": "npm run lint -w @exeq/api && npm run lint -w @exeq/admin",
@@ -79,6 +79,11 @@
     "test:merge-das-fase1": "npm run test:merge-das-fase1 -w @exeq/api",
     "test:e2e:merge-das": "playwright test e2e/merge-das-portal.spec.ts",
     "test:merge-das-fase7": "npm run test:merge-das-fase1 && npm run test:e2e:merge-das",
+    "test:sprint21": "npm run build -w @exeq/fiscal-engine && npm run test:sprint21 -w @exeq/api",
+    "test:sprint22": "npm run test:sprint21 && npm run test -w @exeq/admin -- tests/fiscal-backfill-ui.unit.test.ts",
+    "backfill:snapshots": "node scripts/backfill-tax-snapshot.mjs",
+    "backfill:snapshots:dry-run": "node scripts/backfill-tax-snapshot.mjs --dry-run",
+    "sprint21:backfill:homolog-gate": "node scripts/sprint21-backfill-homolog-gate.mjs",
     "receita:mock:gateway": "node scripts/receita-das-mock-gateway.mjs",
     "sprint15:preflight": "node scripts/sprint15-preflight.mjs",
     "test:sprint15-prep": "npm run test -w @exeq/shared -- tests/pilot-municipios.unit.test.ts && npm run test:sprint15-prep -w @exeq/api",

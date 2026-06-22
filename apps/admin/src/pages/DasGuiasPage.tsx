@@ -4,6 +4,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { EmitDasGuiaInput, TipoGuia } from "@exeq/shared";
 import { api, ApiError } from "../api/client.js";
 import { AppShell } from "../components/AppShell.js";
+import { PortalPage } from "../components/PortalPage.js";
+import { PortalPageHeader } from "../components/PortalPageHeader.js";
 import { getToken } from "../lib/auth.js";
 import {
   buildDasGuiasQuery,
@@ -128,19 +130,22 @@ export function DasGuiasPage() {
 
   return (
     <AppShell>
-      <main className="page" data-testid="page-das-guias">
-        <div className="row">
-          <h1>Guias DAS / DARF</h1>
-          {canEmitDasGuia() ? (
-            <button type="button" onClick={() => setEmitOpen((v) => !v)}>
-              {emitOpen ? "Fechar emissao" : "Emitir guia"}
-            </button>
-          ) : null}
-        </div>
+      <PortalPage testId="page-das-guias">
+        <PortalPageHeader
+          title="Guias DAS / DARF"
+          description="Emissao via gateway Receita (mock ou HTTP) e consulta de guias por competencia."
+          actions={
+            canEmitDasGuia() ? (
+              <button type="button" className="btn-portal-primary" onClick={() => setEmitOpen((v) => !v)}>
+                {emitOpen ? "Fechar emissao" : "Emitir guia"}
+              </button>
+            ) : null
+          }
+        />
 
         {emitOpen && canEmitDasGuia() ? (
-          <section className="card" data-testid="das-emit-form">
-            <h2>Emitir guia fiscal</h2>
+          <section className="dash-panel" data-testid="das-emit-form">
+            <h2 className="dash-panel__title">Emitir guia fiscal</h2>
             <form onSubmit={submitEmit} className="grid filter-grid">
               <label>
                 Prestador
@@ -206,7 +211,7 @@ export function DasGuiasPage() {
           </section>
         ) : null}
 
-        <section className="card filters">
+        <section className="dash-panel filters">
           <div className="grid filter-grid">
             <label>
               Status
@@ -252,7 +257,7 @@ export function DasGuiasPage() {
         {guiasQuery.isLoading && <p>Carregando guias…</p>}
         {guiasQuery.error && <p className="error">Falha ao carregar guias.</p>}
 
-        <section className="card">
+        <section className="dash-panel">
           <table className="table">
             <thead>
               <tr>
@@ -295,7 +300,7 @@ export function DasGuiasPage() {
             </button>
           ) : null}
         </section>
-      </main>
+      </PortalPage>
     </AppShell>
   );
 }

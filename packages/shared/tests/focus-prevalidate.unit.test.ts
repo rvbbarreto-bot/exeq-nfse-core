@@ -12,7 +12,17 @@ const validDto = {
     razao_social: "Prestador LTDA",
     regime_tributario: "simples_nacional" as const,
   },
-  tomador: { documento: "52998224725", nome: "Tomador" },
+  tomador: {
+    documento: "52998224725",
+    nome: "Tomador",
+    endereco: {
+      street: "Rua Dona Sinha",
+      number: "100",
+      district: "Centro",
+      zip_code: "12940000",
+      ibge_code: "3504107",
+    },
+  },
   servico: {
     codigo: "1.01",
     descricao: "Analise de sistemas",
@@ -59,5 +69,14 @@ describe("focus-prevalidate", () => {
         tributacao: { ...validDto.tributacao, simples_codigo_tributacao: undefined },
       }),
     ).toThrow(FocusPrevalidateError);
+  });
+
+  it("rejeita tomador sem endereco completo", () => {
+    const issues = prevalidateExeqNfseV1ForFocus({
+      ...validDto,
+      tomador: { documento: "52998224725", nome: "Tomador" },
+    });
+    expect(issues.some((i) => i.code === "TOMADOR_CEP_OBRIGATORIO")).toBe(true);
+    expect(issues.some((i) => i.code === "TOMADOR_IBGE_OBRIGATORIO")).toBe(true);
   });
 });

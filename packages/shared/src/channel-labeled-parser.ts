@@ -284,6 +284,31 @@ export function isTomadorCityProvided(value: string | undefined): boolean {
   return onlyDigits(text).length !== 7;
 }
 
+/** Descrição fiscal válida — rejeita frases de cidade/intenção capturadas pelo parser. */
+export function isValidFiscalDescription(value: string | undefined): boolean {
+  const d = String(value ?? "").trim();
+  if (d.length < 2) return false;
+  if (/\bcidade\s+(do\s+)?tomador\b/i.test(d)) return false;
+  if (/^e\s+a\s+cidade\b/i.test(d)) return false;
+  if (/^(quero|preciso|vou)\s+(emitir|gerar)/i.test(d)) return false;
+  return true;
+}
+
+export function isTomadorCityPhrase(text: string): boolean {
+  return /\bcidade\s+(do\s+)?tomador\b/i.test(text);
+}
+
+export function extractTomadorCityFromPhrase(text: string): string | undefined {
+  const normalized = text.trim();
+  const labeled = normalized.match(/\bcidade\s+(?:do\s+)?tomador\s*[:\-]?\s*(.+)$/i);
+  if (labeled?.[1]?.trim()) return labeled[1].trim().slice(0, 120);
+
+  const inline = normalized.match(/\bcidade\s+(?:do\s+)?tomador\s+(.+)$/i);
+  if (inline?.[1]?.trim()) return inline[1].trim().slice(0, 120);
+
+  return undefined;
+}
+
 export function applyTomadorCityToAddress(
   address: { ibge_code?: string; city_name?: string },
   raw?: string,
@@ -321,6 +346,10 @@ export function getMissingV11aFields(fields: ChannelLabeledFields): (typeof CHAN
     if (key === "tomador_document") {
       const doc = onlyDigits(v);
       if (!(doc.length === 11 || doc.length === 14)) missing.push(key);
+      continue;
+    }
+    if (key === "description") {
+      if (!isValidFiscalDescription(v)) missing.push(key);
       continue;
     }
     if (key === "ibge_code") {

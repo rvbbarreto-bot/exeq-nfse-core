@@ -1,5 +1,14 @@
 import { z } from "zod";
-import { getMissingV11aFields, getMissingTomadorAddressFields, type ChannelLabeledFields, onlyDigits, normalizeIbge } from "./channel-labeled-parser.js";
+import {
+  CHANNEL_TOMADOR_ADDRESS_FIELDS,
+  CHANNEL_V11A_REQUIRED,
+  getMissingV11aFields,
+  getMissingTomadorAddressFields,
+  isValidFiscalDescription,
+  type ChannelLabeledFields,
+  onlyDigits,
+  normalizeIbge,
+} from "./channel-labeled-parser.js";
 import { emitNfseRequestSchema } from "./nf-issue.js";
 import { emitTomadorAddressSchema } from "./emit-tomador.js";
 
@@ -171,6 +180,24 @@ export function isChannelDraftReadyForConfirm(draft: ChannelDraft): boolean {
   const labeled = draftToV11aFields(draft);
   if (getMissingV11aFields(labeled).length > 0) return false;
   return getMissingTomadorAddressFields(labeled).length === 0;
+}
+
+/** Campos faltantes para resposta ao cliente (V11A + endereço tomador). */
+export function getChannelCollectMissingFields(
+  draft: ChannelDraft,
+): Array<
+  (typeof CHANNEL_V11A_REQUIRED)[number] | (typeof CHANNEL_TOMADOR_ADDRESS_FIELDS)[number]
+> {
+  const labeled = draftToV11aFields(draft);
+  return [...getMissingV11aFields(labeled), ...getMissingTomadorAddressFields(labeled)];
+}
+
+export function sanitizeDraftForMissingCheck(draft: ChannelDraft): ChannelDraft {
+  const next = { ...draft };
+  if (next.description && !isValidFiscalDescription(next.description)) {
+    delete next.description;
+  }
+  return next;
 }
 
 export function draftToEmitRequest(

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { emitTomadorSchema } from "./emit-tomador.js";
 
 export const nfIssueStatusSchema = z.enum([
   "draft",
@@ -50,6 +51,23 @@ export function isTerminalNfIssueStatus(status: NfIssueStatus): boolean {
   return ["authorized", "rejected", "cancelled", "failed"].includes(status);
 }
 
+/** Marco operacional após autorização da prefeitura — documento disponível ao operador. */
+export const NF_ISSUE_MILESTONE_NF_ISSUED = "nf_issued" as const;
+
+export type NfIssueEventMetadata = Record<string, unknown> | null | undefined;
+
+export function isNfIssuedMilestoneEvent(metadata: NfIssueEventMetadata): boolean {
+  return metadata?.milestone === NF_ISSUE_MILESTONE_NF_ISSUED;
+}
+
+/** Emissões autorizadas ou canceladas (já emitidas) podem baixar/sincronizar PDF e XML. */
+export function canAccessNfArtifacts(
+  status: NfIssueStatus,
+  focusRef: string | null | undefined,
+): boolean {
+  return Boolean(focusRef) && (status === "authorized" || status === "cancelled");
+}
+
 export const emitNfseRequestSchema = z.object({
   idempotency_key: z.string().min(8).max(128),
   provider_id: z.string().uuid(),
@@ -60,6 +78,8 @@ export const emitNfseRequestSchema = z.object({
   amount_cents: z.number().int().positive(),
   fiscal_profile_name: z.string().min(2).max(120).optional(),
   description: z.string().min(2).max(2000).optional(),
+  /** Dados do tomador na emissão (CEP, CNPJ/CPF, endereço). Sobrescreve cadastro quando informado. */
+  tomador: emitTomadorSchema.optional(),
 });
 
 export type EmitNfseRequest = z.infer<typeof emitNfseRequestSchema>;
@@ -95,6 +115,16 @@ export const nfIssueDetailSchema = z.object({
       occurred_at: z.string(),
     }),
   ),
+  artifacts: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        kind: z.enum(["xml", "pdf"]),
+        checksum_sha256: z.string(),
+        created_at: z.string(),
+      }),
+    )
+    .optional(),
 });
 
 export type NfIssueDetail = z.infer<typeof nfIssueDetailSchema>;

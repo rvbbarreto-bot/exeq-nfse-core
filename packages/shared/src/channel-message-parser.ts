@@ -1,12 +1,18 @@
 import type { ChannelDraft } from "./channel.js";
-import { isChannelDraftReadyForConfirm } from "./channel.js";
+import {
+  getChannelCollectMissingFields,
+  isChannelDraftReadyForConfirm,
+  sanitizeDraftForMissingCheck,
+} from "./channel.js";
 import {
   applyTomadorCityToAddress,
   buildV11aConfirmationReply,
   buildV11aMissingReply,
   extractLabeledChannelFields,
+  extractTomadorCityFromPhrase,
   getMissingV11aFields,
   getMissingTomadorAddressFields,
+  isTomadorCityPhrase,
   onlyDigits,
   parseAmountCentsFromLabel,
   parseAmountCentsFromFreeformText,
@@ -169,12 +175,21 @@ export function parseChannelMessageText(
   if (amount != null && amount > 0) patch.amount_cents = amount;
   const competence = parseCompetenceIsoFromLabel(normalized);
   if (competence) patch.competence_date = competence;
-  const description = parseDescription(normalized);
-  if (description && !competence) patch.description = description;
+  if (isTomadorCityPhrase(normalized)) {
+    const city = extractTomadorCityFromPhrase(normalized);
+    if (city) {
+      const addr: NonNullable<ChannelDraft["tomador_address"]> = { ...(ctx?.currentDraft?.tomador_address ?? {}) };
+      applyTomadorCityToAddress(addr, city);
+      patch.tomador_address = addr;
+    }
+  } else {
+    const description = parseDescription(normalized);
+    if (description && !competence) patch.description = description;
+    const ibge = resolveMunicipioIbgeFromText(normalized);
+    if (ibge) patch.ibge_code = ibge;
+  }
   const servicePrefixInline = parseServicePrefixText(normalized);
   if (servicePrefixInline?.service_hint) patch.service_hint = servicePrefixInline.service_hint;
-  const ibge = resolveMunicipioIbgeFromText(normalized);
-  if (ibge) patch.ibge_code = ibge;
 
   if (Object.keys(patch).length > 0) {
     return { intent: "inform", patch };
@@ -201,62 +216,44 @@ export function buildChannelCollectReply(
   draft: ChannelDraft,
   options?: { contact_name?: string; labeled?: ChannelLabeledFields },
 ): string {
-  const taxBlock = draft.conversation_flags?.tax_preview_block;
+  const sanitized = sanitizeDraftForMissingCheck(draft);
+  const taxBlock = sanitized.conversation_flags?.tax_preview_block;
   if (missing.length === 0 && taxBlock) {
     return buildChannelTaxPreviewBlockedReply(taxBlock);
   }
 
-  const taxSummary = draft.conversation_flags?.tax_preview_summary as
+  const taxSummary = sanitized.conversation_flags?.tax_preview_summary as
     | ChannelTaxPreviewSummary
     | undefined;
 
-  if (missing.length === 0 && isChannelDraftReadyForConfirm(draft)) {
+  if (missing.length === 0 && isChannelDraftReadyForConfirm(sanitized)) {
     const labeled: ChannelLabeledFields = options?.labeled ?? {
-      tomador_name: draft.tomador_name,
-      tomador_document: draft.tomador_document,
+      tomador_name: sanitized.tomador_name,
+      tomador_document: sanitized.tomador_document,
       amount_label:
-        draft.amount_cents != null
-          ? (draft.amount_cents / 100).toFixed(2).replace(".", ",")
+        sanitized.amount_cents != null
+          ? (sanitized.amount_cents / 100).toFixed(2).replace(".", ",")
           : undefined,
-      description: draft.description,
-      competence_label: draft.competence_date,
-      service_code: draft.service_code,
-      ibge_code: municipioLabelFromIbge(draft.ibge_code) ?? draft.ibge_code,
-      tomador_email: draft.tomador_email,
-      tomador_street: draft.tomador_address?.street,
-      tomador_number: draft.tomador_address?.number,
-      tomador_complement: draft.tomador_address?.complement,
-      tomador_district: draft.tomador_address?.district,
-      tomador_city_ibge: draft.tomador_address?.ibge_code ?? draft.tomador_address?.city_name,
-      tomador_state: draft.tomador_address?.state,
-      tomador_zip: draft.tomador_address?.zip_code,
+      description: sanitized.description,
+      competence_label: sanitized.competence_date,
+      service_code: sanitized.service_code,
+      ibge_code: municipioLabelFromIbge(sanitized.ibge_code) ?? sanitized.ibge_code,
+      tomador_email: sanitized.tomador_email,
+      tomador_street: sanitized.tomador_address?.street,
+      tomador_number: sanitized.tomador_address?.number,
+      tomador_complement: sanitized.tomador_address?.complement,
+      tomador_district: sanitized.tomador_address?.district,
+      tomador_city_ibge:
+        sanitized.tomador_address?.ibge_code ?? sanitized.tomador_address?.city_name,
+      tomador_state: sanitized.tomador_address?.state,
+      tomador_zip: sanitized.tomador_address?.zip_code,
     };
 
     const base = buildV11aConfirmationReply(labeled);
     return taxSummary?.ready ? appendTaxPreviewToConfirmation(base, taxSummary) : base;
   }
 
-  const labeled: ChannelLabeledFields = options?.labeled ?? {
-    tomador_name: draft.tomador_name,
-    tomador_document: draft.tomador_document,
-    amount_label:
-      draft.amount_cents != null ? String(draft.amount_cents / 100) : undefined,
-    description: draft.description,
-    competence_label: draft.competence_date,
-    service_code: draft.service_code,
-    ibge_code: draft.ibge_code,
-    tomador_street: draft.tomador_address?.street,
-    tomador_number: draft.tomador_address?.number,
-    tomador_complement: draft.tomador_address?.complement,
-    tomador_district: draft.tomador_address?.district,
-    tomador_city_ibge: draft.tomador_address?.ibge_code ?? draft.tomador_address?.city_name,
-    tomador_state: draft.tomador_address?.state,
-    tomador_zip: draft.tomador_address?.zip_code,
-  };
-
-  const v11aMissing = getMissingV11aFields(labeled);
-  const addressMissing = getMissingTomadorAddressFields(labeled);
-  const allMissing = [...v11aMissing, ...addressMissing];
+  const allMissing = getChannelCollectMissingFields(sanitized);
 
   if (allMissing.length > 0) {
     return buildV11aMissingReply(options?.contact_name, allMissing);

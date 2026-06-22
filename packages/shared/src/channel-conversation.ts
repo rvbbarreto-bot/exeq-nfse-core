@@ -4,6 +4,8 @@ import {
   applyTomadorCityToAddress,
   getMissingTomadorAddressFields,
   getMissingV11aFields,
+  isTomadorCityPhrase,
+  isValidFiscalDescription,
   onlyDigits,
   parseAmountCentsFromLabel,
   parseAmountCentsFromFreeformText,
@@ -147,6 +149,7 @@ export function parseServicePrefixText(text: string): Partial<ChannelDraft> | nu
 function extractDescriptionFreeform(text: string): string | undefined {
   if (isVagueEmissionPhrase(text)) return undefined;
   if (isDataRequestMessage(text)) return undefined;
+  if (isTomadorCityPhrase(text)) return undefined;
 
   const normalized = normalizeText(text);
   if (parseCompetenceIsoFromLabel(normalized)) return undefined;
@@ -161,7 +164,9 @@ function extractDescriptionFreeform(text: string): string | undefined {
 
   if (text.length >= 8 && !GREETING_RE.test(text) && !EMISSION_INTENT_RE.test(text)) {
     if (!extractTomadorDocument(text) && !parseAmountCentsFromFreeformText(text)) {
-      return text.slice(0, 2000);
+      const candidate = text.slice(0, 2000);
+      if (!isValidFiscalDescription(candidate)) return undefined;
+      return candidate;
     }
   }
   return undefined;

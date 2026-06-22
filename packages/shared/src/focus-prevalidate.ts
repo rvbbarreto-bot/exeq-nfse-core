@@ -1,4 +1,6 @@
 import type { ExeqNfseV1 } from "./nfse-v1.js";
+import { isCompleteTomadorAddress } from "./emit-tomador.js";
+import type { Address } from "./master-data.js";
 
 export type FocusPrevalidateIssue = {
   field: string;
@@ -82,6 +84,46 @@ export function prevalidateExeqNfseV1ForFocus(dto: ExeqNfseV1): FocusPrevalidate
       code: "DESCRICAO_OBRIGATORIA",
       message: "Discriminacao do servico obrigatoria",
     });
+  }
+
+  const endereco = dto.tomador.endereco as Address | undefined;
+  if (!isCompleteTomadorAddress(endereco)) {
+    if (!endereco?.street?.trim()) {
+      issues.push({
+        field: "tomador.endereco.street",
+        code: "TOMADOR_LOGRADOURO_OBRIGATORIO",
+        message: "Logradouro do tomador obrigatorio na emissao",
+      });
+    }
+    if (!endereco?.number?.trim()) {
+      issues.push({
+        field: "tomador.endereco.number",
+        code: "TOMADOR_NUMERO_OBRIGATORIO",
+        message: "Numero do endereco do tomador obrigatorio",
+      });
+    }
+    if (!endereco?.district?.trim()) {
+      issues.push({
+        field: "tomador.endereco.district",
+        code: "TOMADOR_BAIRRO_OBRIGATORIO",
+        message: "Bairro do tomador obrigatorio",
+      });
+    }
+    const zip = (endereco?.zip_code ?? "").replace(/\D/g, "");
+    if (zip.length !== 8) {
+      issues.push({
+        field: "tomador.endereco.zip_code",
+        code: "TOMADOR_CEP_OBRIGATORIO",
+        message: "CEP do tomador obrigatorio (8 digitos)",
+      });
+    }
+    if (!endereco?.ibge_code || endereco.ibge_code.length !== 7) {
+      issues.push({
+        field: "tomador.endereco.ibge_code",
+        code: "TOMADOR_IBGE_OBRIGATORIO",
+        message: "Codigo IBGE do municipio do tomador obrigatorio",
+      });
+    }
   }
 
   return issues;

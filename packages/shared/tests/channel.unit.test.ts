@@ -3,6 +3,7 @@ import {
   buildChannelStatusMessage,
   draftToEmitRequest,
   getMissingDraftFields,
+  isChannelDraftReadyForConfirm,
   isDraftReady,
 } from "../src/channel.js";
 
@@ -21,10 +22,54 @@ describe("channel draft", () => {
     expect(isDraftReady(complete)).toBe(true);
   });
 
-  it("converte draft completo para emit request", () => {
-    const emit = draftToEmitRequest(complete, "channel-idem-001");
+  it("nao libera confirmacao sem V11A mesmo com customer_id", () => {
+    expect(
+      isChannelDraftReadyForConfirm({
+        ...complete,
+        tomador_name: undefined,
+        tomador_document: undefined,
+      }),
+    ).toBe(false);
+  });
+
+  it("libera confirmacao com IDs e V11A completos", () => {
+    expect(
+      isChannelDraftReadyForConfirm({
+        ...complete,
+        tomador_name: "Empresa Exemplo Ltda",
+        tomador_document: "11444777000161",
+        description: "Consultoria",
+        service_code: "1.01",
+        tomador_address: {
+          street: "Rua Exemplo",
+          number: "100",
+          district: "Centro",
+          zip_code: "12940000",
+          ibge_code: "3525102",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("converte draft completo para emit request com tomador", () => {
+    const emit = draftToEmitRequest(
+      {
+        ...complete,
+        tomador_name: "Empresa Exemplo Ltda",
+        tomador_document: "11444777000161",
+        tomador_address: {
+          street: "Rua Exemplo",
+          number: "100",
+          district: "Centro",
+          zip_code: "12940000",
+          ibge_code: "3525102",
+        },
+      },
+      "channel-idem-001",
+    );
     expect(emit.idempotency_key).toBe("channel-idem-001");
     expect(emit.amount_cents).toBe(100000);
+    expect(emit.tomador?.address.zip_code).toBe("12940000");
   });
 
   it("monta mensagem de notificacao autorizada (Focus)", () => {

@@ -9,6 +9,7 @@ import { registerRbacHooks } from "./plugins/rbac.js";
 import { authRoutes } from "./modules/platform/auth.routes.js";
 import { taxRoutes } from "./modules/fiscal/tax.routes.js";
 import { catalogRoutes } from "./modules/fiscal/catalog.routes.js";
+import { dasRoutes } from "./modules/das/das.routes.js";
 import { municipalRulesRoutes } from "./modules/fiscal/municipal-rules/municipal-rules.routes.js";
 import { masterDataRoutes } from "./modules/master-data/master-data.routes.js";
 import { nfIssueRoutes } from "./modules/issuance/nf-issue.routes.js";
@@ -84,6 +85,9 @@ export async function buildApp() {
   await app.register(webhookInboxRoutes);
   await app.register(opsRoutes);
   await app.register(channelRoutes);
+  if (env.FISCAL_DAS_ENABLED) {
+    await app.register(dasRoutes);
+  }
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ZodError) {

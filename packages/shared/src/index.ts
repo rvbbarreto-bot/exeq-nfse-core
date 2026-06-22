@@ -26,3 +26,4 @@ export * from "./fiscal-preview.js";
 export * from "./channel-tax-preview.js";
 export * from "./split-payment.js";
 export * from "./tenant-migration.js";
+export * from "./das.js";

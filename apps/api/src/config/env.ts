@@ -87,6 +87,20 @@ const envSchema = z.object({
   BETHA_PORTAL_AMBIENTE: z.enum(["homolog", "producao"]).optional(),
   BETHA_DEFAULT_NBS: z.string().regex(/^\d{9}$/).default("115013000"),
   BETHA_SUITE_PORTAL_URL: z.string().url().optional(),
+  /** Merge DAS — módulo guias DAS/DARF habilitado. */
+  FISCAL_DAS_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
+  /** Gateway Receita: mock in-process (dev/test). */
+  RECEITA_DAS_MOCK: z
+    .enum(["true", "false"])
+    .default(process.env.NODE_ENV === "test" ? "true" : "false")
+    .transform((v) => v === "true"),
+  /** Gateway Receita: mock | http (homolog/prod). */
+  RECEITA_GATEWAY_PROVIDER: z.enum(["mock", "http"]).default("mock"),
+  /** Base URL mock/http Receita (ex.: http://127.0.0.1:19443). */
+  RECEITA_DAS_CAPTURE_URL: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

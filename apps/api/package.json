@@ -19,6 +19,7 @@
     "test:sprint18": "vitest run tests/sprint18.go-live-suporte.test.ts",
     "test:sprint20": "vitest run tests/sprint20.hypercare-dx.test.ts",
     "test:sprint19": "vitest run tests/sprint19.gateway-producao.test.ts",
+    "test:merge-das-fase1": "vitest run tests/merge-das-fase1.test.ts tests/das-receita-gateway.unit.test.ts",
     "test:sprint15-prep": "vitest run tests/sprint15.prep-5o-municipio.test.ts",
     "test:sprint15": "vitest run tests/sprint15.5o-municipio.test.ts",
     "test:watch": "vitest",

@@ -76,6 +76,8 @@
     "test:sprint18": "npm run test:sprint18 -w @exeq/api",
     "test:sprint20": "npm run test:sprint20 -w @exeq/api",
     "test:sprint19": "npm run test:sprint19 -w @exeq/api",
+    "test:merge-das-fase1": "npm run test:merge-das-fase1 -w @exeq/api",
+    "receita:mock:gateway": "node scripts/receita-das-mock-gateway.mjs",
     "sprint15:preflight": "node scripts/sprint15-preflight.mjs",
     "test:sprint15-prep": "npm run test -w @exeq/shared -- tests/pilot-municipios.unit.test.ts && npm run test:sprint15-prep -w @exeq/api",
     "test:sprint15": "npm run test:sprint15 -w @exeq/api",
